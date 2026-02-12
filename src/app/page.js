@@ -80,9 +80,9 @@ export default function Marketplace() {
     const fetchData = async () => {
       try {
         // We add populate=* to ensure we get the 'reviews' relation
-        const p = await axios.get('http://localhost:1337/api/products?populate=*');
-        const s = await axios.get('http://localhost:1337/api/services?populate=*');
-        const l = await axios.get('http://localhost:1337/api/livestreams?populate=*');
+        const p = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/products?populate=*`);
+        const s = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/services?populate=*`);
+        const l = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/livestreams?populate=*`);
 
         const products = normalizeData(p.data.data, 'product');
         const services = normalizeData(s.data.data, 'service');
@@ -213,9 +213,9 @@ export default function Marketplace() {
                 <div className="card-image" style={{ cursor: 'pointer' }}>
                     {item.mediaUrl ? (
                       item.isVideo ? (
-                          <video src={`http://localhost:1337${item.mediaUrl}`} style={{maxWidth:'100%', maxHeight:'100%'}} />
+                          <video src={`${process.env.NEXT_PUBLIC_API_URL}${item.mediaUrl}`} style={{maxWidth:'100%', maxHeight:'100%'}} />
                       ) : (
-                          <img src={`http://localhost:1337${item.mediaUrl}`} alt={item.name} style={{width:'100%', height:'100%', objectFit:'contain'}} />
+                          <img src={`${process.env.NEXT_PUBLIC_API_URL}${item.mediaUrl}`} alt={item.name} style={{width:'100%', height:'100%', objectFit:'contain'}} />
                       )
                     ) : (
                       <div style={{color:'#ccc', display:'flex', alignItems:'center', justifyContent:'center', height:'100%', background:'#f3f4f6'}}>No Image</div>
