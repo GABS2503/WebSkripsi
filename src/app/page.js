@@ -5,6 +5,20 @@ import Script from 'next/script';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
+// --- 1. SMART IMAGE HELPER (Prevents Double URLs) ---
+const getImageUrl = (url) => {
+  if (!url) return null;
+  
+  // If the URL is already a full link (Cloudinary, AWS, or already has http), use it as is
+  if (url.startsWith('http') || url.startsWith('//')) {
+    return url;
+  }
+  
+  // Otherwise, prepend the Backend URL
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:1337';
+  return `${baseUrl}${url}`;
+};
+
 export default function Marketplace() {
   const router = useRouter();
   const [items, setItems] = useState([]);
@@ -39,14 +53,15 @@ export default function Marketplace() {
       const shopName = sellerData?.shopName || sellerData?.username || "Unknown Shop";
       
       const firstMedia = getFirstMedia(data.media);
-      const mediaUrl = firstMedia?.url || null;
+      
+      // --- FIX APPLIED HERE: Use getImageUrl immediately ---
+      // This ensures item.mediaUrl is ALWAYS a full, valid link
+      const mediaUrl = getImageUrl(firstMedia?.url);
       const mimeType = firstMedia?.mime || '';
 
       // --- NEW: CALCULATE RATINGS ---
-      // 1. Get the reviews array (safely handle Strapi v4/v5 structures)
       const reviews = data.reviews?.data || data.reviews || [];
       
-      // 2. Calculate Stats
       const reviewCount = reviews.length;
       let averageRating = 0;
       
@@ -64,9 +79,8 @@ export default function Marketplace() {
         ...data,
         type: type,
         sellerName: shopName,
-        mediaUrl: mediaUrl,
+        mediaUrl: mediaUrl, // Now contains full URL
         isVideo: mimeType.startsWith('video/'),
-        // Add stats to the object
         reviewCount: reviewCount, 
         rating: averageRating
       };
@@ -122,7 +136,7 @@ export default function Marketplace() {
 
   return (
     <div>
-      <Script src="https://app.sandbox.midtrans.com/snap/snap.js" data-client-key="YOUR_CLIENT_KEY" />
+      <Script src="https://app.sandbox.midtrans.com/snap/snap.js" data-client-key={process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY} strategy="lazyOnload"/>
       
       {/* --- NAVBAR --- */}
       <nav className="navbar">
@@ -213,9 +227,11 @@ export default function Marketplace() {
                 <div className="card-image" style={{ cursor: 'pointer' }}>
                     {item.mediaUrl ? (
                       item.isVideo ? (
-                          <video src={`${process.env.NEXT_PUBLIC_API_URL}${item.mediaUrl}`} style={{maxWidth:'100%', maxHeight:'100%'}} />
+                          // FIX: Removed process.env... prefix because item.mediaUrl is already full
+                          <video src={item.mediaUrl} style={{maxWidth:'100%', maxHeight:'100%'}} />
                       ) : (
-                          <img src={`${process.env.NEXT_PUBLIC_API_URL}${item.mediaUrl}`} alt={item.name} style={{width:'100%', height:'100%', objectFit:'contain'}} />
+                          // FIX: Removed process.env... prefix
+                          <img src={item.mediaUrl} alt={item.name} style={{width:'100%', height:'100%', objectFit:'contain'}} />
                       )
                     ) : (
                       <div style={{color:'#ccc', display:'flex', alignItems:'center', justifyContent:'center', height:'100%', background:'#f3f4f6'}}>No Image</div>
@@ -228,19 +244,14 @@ export default function Marketplace() {
                    <h3 style={{cursor:'pointer'}}>{item.name}</h3>
                 </Link>
                 
-                {/* --- UPDATED RATING SECTION --- */}
+                {/* --- RATING SECTION --- */}
                 <div style={{color:'#ffa41c', fontSize:'0.9rem', margin:'0.2rem 0', display:'flex', alignItems:'center', gap:'5px'}}>
-                   {/* 1. Show Stars based on Average */}
                    <span style={{fontSize:'1.1rem', letterSpacing:'-2px'}}>
                       {renderStars(item.rating || 0)}
                    </span>
-                   
-                   {/* 2. Show Numeric Average (optional, good for precision) */}
                    <span style={{color:'#333', fontSize:'0.8rem', fontWeight:'bold'}}>
                      {item.rating > 0 ? item.rating.toFixed(1) : ''}
                    </span>
-
-                   {/* 3. Show Count */}
                    <span style={{color:'#007185', fontSize:'0.85rem'}}>
                       ({item.reviewCount || 0})
                    </span>
