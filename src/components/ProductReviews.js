@@ -33,7 +33,7 @@ export default function ProductReviews({ itemId, itemType }) {
         'sort': 'createdAt:desc'
       }).toString();
 
-      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}api/reviews?${query}`);
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/reviews?${query}`);
       setReviews(res.data.data);
     } catch (err) {
       console.error("Error fetching reviews:", err);
@@ -63,7 +63,7 @@ export default function ProductReviews({ itemId, itemType }) {
       if (!parentId && media) {
         const formData = new FormData();
         formData.append('files', media);
-        const uploadRes = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}api/upload`, formData, {
+        const uploadRes = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/upload`, formData, {
           headers: { Authorization: `Bearer ${token}` }
         });
         mediaId = uploadRes.data[0].id;
@@ -81,7 +81,7 @@ export default function ProductReviews({ itemId, itemType }) {
         }
       };
 
-      await axios.post(`${process.env.NEXT_PUBLIC_API_URL}api/reviews`, payload, {
+      await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/reviews`, payload, {
         headers: { Authorization: `Bearer ${token}` }
       });
 

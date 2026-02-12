@@ -4,7 +4,22 @@ import axios from 'axios';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Script from 'next/script';
-import ProductReviews from '@/components/ProductReviews'; // <--- 1. NEW IMPORT
+import ProductReviews from '@/components/ProductReviews';
+
+// --- 1. SMART IMAGE HELPER (Prevents Double URLs) ---
+const getImageUrl = (url) => {
+  if (!url) return '/placeholder.png'; // Ensure you have a placeholder.png in public folder
+  
+  // If the URL is already a full link (Cloudinary, AWS, or already has http), use it as is
+  if (url.startsWith('http') || url.startsWith('//')) {
+    return url;
+  }
+  
+  // Otherwise, prepend the Backend URL
+  // We use || to default to localhost if the env var is missing
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:1337';
+  return `${baseUrl}${url}`;
+};
 
 export default function ItemDetails() {
   const router = useRouter();
@@ -29,7 +44,6 @@ export default function ItemDetails() {
         const token = localStorage.getItem('token');
         const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
         
-        // Fetch item details (using direct ID for "Get One" endpoint)
         const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/${endpoint}/${id}?populate=*`, config);
         
         console.log("Full Item Data:", res.data.data);
@@ -73,8 +87,6 @@ export default function ItemDetails() {
       }
     }
 
-    console.log("Chat Debug -> Found Seller ID:", sellerId);
-
     if (!sellerId) {
       alert("Error: Could not read Seller ID. Please check console for details.");
       return;
@@ -104,7 +116,6 @@ export default function ItemDetails() {
     }
   };
 
-  // Replace your existing handleBuy function with this one:
   const handleBuy = async () => {
     const price = item?.price || item?.attributes?.price;
     const name = item?.name || item?.attributes?.name;
@@ -121,7 +132,6 @@ export default function ItemDetails() {
     try {
       const correctId = item.documentId || item.id;
 
-      // 1. Request Payment Token from Backend
       const res = await axios.post('/api/payment', { 
         id: correctId, 
         price: (price * quantity), 
@@ -132,27 +142,20 @@ export default function ItemDetails() {
       const token = res.data.token;
       if (!token) throw new Error("No token received from backend");
 
-      // 2. Open Snap Popup with Callbacks (THE MISSING PART)
       // @ts-ignore
       window.snap.pay(token, {
-        // Callback when payment is successful
         onSuccess: function(result) {
           console.log("Payment Success:", result);
           alert("Payment Successful! Thank you for your purchase.");
-          // Optional: Redirect to a success page or clear cart
-          // router.push('/order-history'); 
         },
-        // Callback when payment is pending (e.g. waiting for Bank Transfer)
         onPending: function(result) {
           console.log("Payment Pending:", result);
           alert("Payment Pending! Please complete the payment via your selected method.");
         },
-        // Callback when payment failed
         onError: function(result) {
           console.log("Payment Error:", result);
           alert("Payment Failed. Please try again.");
         },
-        // Callback when user closes the popup without finishing
         onClose: function() {
           alert("You closed the payment popup without finishing.");
         }
@@ -176,6 +179,7 @@ export default function ItemDetails() {
   const maxStock = data.stock || 999;
   const isOutOfStock = type === 'product' && maxStock < 1;
 
+  // --- 2. UPDATED MEDIA LIST TO USE HELPER ---
   const getMediaList = (mediaField) => {
     if (!mediaField) return [];
     const unwrapped = mediaField.data || mediaField;
@@ -185,7 +189,8 @@ export default function ItemDetails() {
       if (!finalData?.url) return null;
       return {
         id: item.id,
-        url: `${process.env.NEXT_PUBLIC_API_URL}${finalData.url}`,
+        // USE HELPER HERE instead of manual template literal
+        url: getImageUrl(finalData.url), 
         isVideo: finalData.mime?.startsWith('video/')
       };
     }).filter(Boolean);
@@ -275,7 +280,8 @@ export default function ItemDetails() {
                     const isSelected = selectedVariants[variant.name] === name;
                     return (
                       <button key={idx} onClick={() => handleVariantSelect(variant.name, name)} style={{padding: '0.5rem 1rem', border: isSelected ? '2px solid #e77600' : '1px solid #d1d5db', background: isSelected ? '#fff4e3' : 'white', borderRadius: '4px', cursor: 'pointer', fontWeight: isSelected ? 'bold' : 'normal', display: 'flex', alignItems: 'center', gap: '8px'}}>
-                        {image && <img src={`${process.env.NEXT_PUBLIC_API_URL}${image.url}`} alt={name} style={{width:'24px', height:'24px', objectFit:'cover', borderRadius:'4px', border:'1px solid #eee'}} />}
+                        {/* 3. USE HELPER HERE TOO */}
+                        {image && <img src={getImageUrl(image.url)} alt={name} style={{width:'24px', height:'24px', objectFit:'cover', borderRadius:'4px', border:'1px solid #eee'}} />}
                         {name}
                       </button>
                     )
@@ -306,16 +312,13 @@ export default function ItemDetails() {
           </div>
         </div>
 
-        {/* --- 2. NEW REVIEWS SECTION --- */}
-        {/* We prefer documentId for v5 filtering, fallback to id for v4 */}
         <ProductReviews itemId={item.documentId || item.id} itemType={type} />
 
       </main>
 
-      {/* --- SCRIPT TAG --- */}
       <Script 
         src="https://app.sandbox.midtrans.com/snap/snap.js"
-        data-client-key="SB-Mid-client-5Palqn_HYf6iXJ0n"
+        data-client-key={process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY} // Best practice: use Env Var for key too
         strategy="lazyOnload" 
       />
     </div>
