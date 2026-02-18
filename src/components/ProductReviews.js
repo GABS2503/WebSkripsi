@@ -2,6 +2,14 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 
+// --- SMART IMAGE HELPER ---
+const getImageUrl = (url) => {
+  if (!url) return null;
+  if (url.startsWith('http') || url.startsWith('//')) return url;
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:1337';
+  return `${baseUrl}${url}`;
+};
+
 export default function ProductReviews({ itemId, itemType }) {
   const [reviews, setReviews] = useState([]);
   const [newComment, setNewComment] = useState('');
@@ -16,10 +24,12 @@ export default function ProductReviews({ itemId, itemType }) {
     const u = localStorage.getItem('user');
     if (u) setUser(JSON.parse(u));
     fetchReviews();
-  }, [itemId]);
+  }, [itemId, itemType]);
 
   const fetchReviews = async () => {
     try {
+      if (!itemId) return;
+
       // Filter by product OR service depending on type
       const filterField = itemType === 'product' ? 'product' : 'service';
       
@@ -75,9 +85,12 @@ export default function ProductReviews({ itemId, itemType }) {
           content: content,
           rating: parentId ? null : rating, // Replies don't have ratings usually
           user: user.id,
+          // Support both product and service relations
           [itemType === 'product' ? 'product' : 'service']: itemId,
           parent: parentId, // Link to parent if it's a reply
-          media: mediaId
+          media: mediaId,
+          // Fallback author name if user relation fails
+          authorName: user.username 
         }
       };
 
@@ -165,6 +178,8 @@ export default function ProductReviews({ itemId, itemType }) {
           const rData = review.attributes || review;
           const rUser = rData.user?.data?.attributes || rData.user || {};
           const rMedia = rData.media?.data?.attributes || rData.media;
+          // Use Helper for the main review image
+          const rMediaUrl = getImageUrl(rMedia?.url);
           const replies = rData.replies?.data || rData.replies || [];
 
           return (
@@ -172,10 +187,10 @@ export default function ProductReviews({ itemId, itemType }) {
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <div style={{ width: '35px', height: '35px', background: '#3b82f6', color: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
-                    {rUser.username?.[0]?.toUpperCase() || 'U'}
+                    {rUser.username?.[0]?.toUpperCase() || (rData.authorName ? rData.authorName[0].toUpperCase() : 'U')}
                   </div>
                   <div>
-                    <div style={{ fontWeight: 'bold' }}>{rUser.username || 'Anonymous'}</div>
+                    <div style={{ fontWeight: 'bold' }}>{rUser.username || rData.authorName || 'Anonymous'}</div>
                     <div style={{ color: '#fbbf24', fontSize: '0.9rem' }}>{renderStars(rData.rating || 0)}</div>
                   </div>
                 </div>
@@ -186,11 +201,11 @@ export default function ProductReviews({ itemId, itemType }) {
 
               <p style={{ color: '#374151', lineHeight: '1.5', margin: '0.5rem 0' }}>{rData.content}</p>
 
-              {rMedia && (
+              {rMediaUrl && (
                 <img 
-                  src={`${process.env.NEXT_PUBLIC_API_URL}${rMedia.url}`} 
+                  src={rMediaUrl} 
                   alt="Review attachment" 
-                  style={{ maxWidth: '150px', borderRadius: '6px', marginTop: '0.5rem', border: '1px solid #eee' }} 
+                  style={{ maxWidth: '150px', maxHeight: '150px', borderRadius: '6px', marginTop: '0.5rem', border: '1px solid #eee' }} 
                 />
               )}
 
@@ -232,7 +247,7 @@ export default function ProductReviews({ itemId, itemType }) {
                     return (
                       <div key={reply.id} style={{ marginBottom: '0.8rem' }}>
                         <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#111827' }}>
-                          {repUser.username || 'User'} 
+                          {repUser.username || repData.authorName || 'User'} 
                           <span style={{ fontWeight: 'normal', color: '#6b7280', marginLeft: '5px', fontSize: '0.75rem' }}>
                             • {new Date(repData.createdAt).toLocaleDateString()}
                           </span>
