@@ -6,8 +6,10 @@ import axios from 'axios';
 const getImageUrl = (url) => {
   if (!url) return null;
   if (url.startsWith('http') || url.startsWith('//')) return url;
+  // Remove any leading slash to prevent double slashes with base URL
+  const cleanUrl = url.startsWith('/') ? url.substring(1) : url;
   const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:1337';
-  return `${baseUrl}${url}`;
+  return `${baseUrl}/${cleanUrl}`;
 };
 
 export default function ProductReviews({ itemId, itemType }) {
@@ -30,10 +32,9 @@ export default function ProductReviews({ itemId, itemType }) {
     try {
       if (!itemId) return;
 
-      // Filter by product OR service depending on type
       const filterField = itemType === 'product' ? 'product' : 'service';
       
-      // We fetch top-level reviews (where parent is null)
+      // Fetch top-level reviews (parent is null)
       const query = new URLSearchParams({
         [`filters[${filterField}][documentId][$eq]`]: itemId,
         'filters[parent][$null]': 'true', 
@@ -69,7 +70,7 @@ export default function ProductReviews({ itemId, itemType }) {
       const token = localStorage.getItem('token');
       let mediaId = null;
 
-      // 1. Upload Image (only for top-level reviews in this example)
+      // 1. Upload Image (only for main reviews)
       if (!parentId && media) {
         const formData = new FormData();
         formData.append('files', media);
@@ -83,13 +84,11 @@ export default function ProductReviews({ itemId, itemType }) {
       const payload = {
         data: {
           content: content,
-          rating: parentId ? null : rating, // Replies don't have ratings usually
+          rating: parentId ? null : rating,
           user: user.id,
-          // Support both product and service relations
           [itemType === 'product' ? 'product' : 'service']: itemId,
-          parent: parentId, // Link to parent if it's a reply
+          parent: parentId,
           media: mediaId,
-          // Fallback author name if user relation fails
           authorName: user.username 
         }
       };
@@ -109,7 +108,7 @@ export default function ProductReviews({ itemId, itemType }) {
         setRating(5);
       }
       
-      fetchReviews(); // Refresh list
+      fetchReviews();
     } catch (err) {
       console.error(err);
       alert("Failed to submit review");
@@ -120,54 +119,49 @@ export default function ProductReviews({ itemId, itemType }) {
     return "★".repeat(count) + "☆".repeat(5 - count);
   };
 
+  // --- HELPER FOR SAFELY EXTRACTING REVIEW IMAGE URL ---
+  const getReviewImageUrl = (mediaData) => {
+      if (!mediaData) return null;
+      let raw = mediaData;
+      // Handle { data: ... } wrapper
+      if (raw.data) raw = raw.data;
+      // Handle arrays (take first item)
+      if (Array.isArray(raw)) raw = raw[0];
+      // Handle attributes wrapper
+      const attrs = raw?.attributes || raw;
+      return getImageUrl(attrs?.url);
+  };
+
   return (
     <div style={{ marginTop: '3rem', background: 'white', padding: '2rem', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
       <h3 style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>Customer Reviews</h3>
 
-      {/* --- WRITE REVIEW FORM --- */}
+      {/* --- MAIN WRITE REVIEW FORM --- */}
       {user ? (
         <form onSubmit={(e) => handleSubmit(e)} style={{ marginBottom: '2rem', background: '#f9fafb', padding: '1.5rem', borderRadius: '8px' }}>
+          {/* Rating Stars */}
           <div style={{ marginBottom: '1rem' }}>
             <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.5rem' }}>Rating</label>
             <div style={{ display: 'flex', gap: '5px' }}>
               {[1, 2, 3, 4, 5].map((star) => (
-                <button 
-                  key={star} 
-                  type="button" 
-                  onClick={() => setRating(star)}
-                  style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: star <= rating ? '#fbbf24' : '#d1d5db' }}
-                >
-                  ★
-                </button>
+                <button key={star} type="button" onClick={() => setRating(star)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: star <= rating ? '#fbbf24' : '#d1d5db' }}>★</button>
               ))}
             </div>
           </div>
-
+          {/* Text Area */}
           <div style={{ marginBottom: '1rem' }}>
-            <textarea 
-              className="input-field" 
-              rows={3} 
-              placeholder="Write your review..." 
-              value={newComment} 
-              onChange={(e) => setNewComment(e.target.value)} 
-              style={{ width: '100%', padding: '0.8rem', borderRadius: '6px', border: '1px solid #d1d5db' }}
-            />
+            <textarea className="input-field" rows={3} placeholder="Write your review..." value={newComment} onChange={(e) => setNewComment(e.target.value)} style={{ width: '100%', padding: '0.8rem', borderRadius: '6px', border: '1px solid #d1d5db' }} />
           </div>
-
+          {/* Image Upload */}
           <div style={{ marginBottom: '1rem' }}>
             <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.5rem', fontSize:'0.9rem' }}>Add Photo (Optional)</label>
             <input type="file" accept="image/*" onChange={handleImageChange} />
             {preview && <img src={preview} alt="Preview" style={{ height: '60px', marginTop: '10px', borderRadius: '4px' }} />}
           </div>
-
-          <button type="submit" className="btn-primary" style={{ background: '#2563eb', color: 'white', border: 'none', padding: '0.6rem 1.2rem', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}>
-            Submit Review
-          </button>
+          <button type="submit" className="btn-primary" style={{ background: '#2563eb', color: 'white', border: 'none', padding: '0.6rem 1.2rem', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}>Submit Review</button>
         </form>
       ) : (
-        <div style={{ padding: '1rem', background: '#eff6ff', color: '#1e40af', borderRadius: '6px', marginBottom: '2rem' }}>
-          Please <a href="/login" style={{ fontWeight: 'bold', textDecoration: 'underline' }}>log in</a> to write a review.
-        </div>
+        <div style={{ padding: '1rem', background: '#eff6ff', color: '#1e40af', borderRadius: '6px', marginBottom: '2rem' }}>Please <a href="/login" style={{ fontWeight: 'bold', textDecoration: 'underline' }}>log in</a> to write a review.</div>
       )}
 
       {/* --- REVIEWS LIST --- */}
@@ -177,14 +171,16 @@ export default function ProductReviews({ itemId, itemType }) {
         {reviews.map((review) => {
           const rData = review.attributes || review;
           const rUser = rData.user?.data?.attributes || rData.user || {};
-          const rMedia = rData.media?.data?.attributes || rData.media;
-          // Use Helper for the main review image
-          const rMediaUrl = getImageUrl(rMedia?.url);
+          // FIX 1: Robust Image URL Extraction
+          const rMediaUrl = getReviewImageUrl(rData.media);
           const replies = rData.replies?.data || rData.replies || [];
+          const reviewId = review.documentId || review.id;
+          const isActiveReply = activeReplyId === reviewId;
 
           return (
             <div key={review.id} style={{ borderBottom: '1px solid #e5e7eb', paddingBottom: '1.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+              {/* Review Header: User, Rating, Date, and Reply Button */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', alignItems: 'flex-start' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <div style={{ width: '35px', height: '35px', background: '#3b82f6', color: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
                     {rUser.username?.[0]?.toUpperCase() || (rData.authorName ? rData.authorName[0].toUpperCase() : 'U')}
@@ -194,65 +190,69 @@ export default function ProductReviews({ itemId, itemType }) {
                     <div style={{ color: '#fbbf24', fontSize: '0.9rem' }}>{renderStars(rData.rating || 0)}</div>
                   </div>
                 </div>
-                <div style={{ fontSize: '0.8rem', color: '#9ca3af' }}>
-                  {new Date(rData.createdAt).toLocaleDateString()}
+                
+                {/* FIX 2: Reply Button moved to top right next to date */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                    <div style={{ fontSize: '0.8rem', color: '#9ca3af' }}>
+                    {new Date(rData.createdAt).toLocaleDateString()}
+                    </div>
+                    {user && (
+                        <button 
+                        onClick={() => setActiveReplyId(isActiveReply ? null : reviewId)}
+                        style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.85rem', cursor: 'pointer', padding: 0, marginTop:'4px' }}
+                        >
+                        {isActiveReply ? 'Cancel' : 'Reply'}
+                        </button>
+                    )}
                 </div>
               </div>
 
+              {/* Review Content */}
               <p style={{ color: '#374151', lineHeight: '1.5', margin: '0.5rem 0' }}>{rData.content}</p>
 
+              {/* Review Image */}
               {rMediaUrl && (
                 <img 
                   src={rMediaUrl} 
                   alt="Review attachment" 
-                  style={{ maxWidth: '150px', maxHeight: '150px', borderRadius: '6px', marginTop: '0.5rem', border: '1px solid #eee' }} 
+                  style={{ maxWidth: '150px', maxHeight: '150px', borderRadius: '6px', marginTop: '0.5rem', border: '1px solid #eee', display: 'block' }} 
                 />
               )}
 
-              {/* --- REPLY BUTTON --- */}
-              <div style={{ marginTop: '0.5rem' }}>
-                <button 
-                  onClick={() => setActiveReplyId(activeReplyId === review.id ? null : review.id)}
-                  style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.85rem', cursor: 'pointer', padding: 0 }}
-                >
-                  {activeReplyId === review.id ? 'Cancel Reply' : 'Reply'}
-                </button>
-              </div>
-
-              {/* --- REPLY FORM --- */}
-              {activeReplyId === review.id && user && (
-                <div style={{ marginTop: '10px', marginLeft: '2rem', display: 'flex', gap: '10px' }}>
+              {/* --- REPLY FORM (Shown if active) --- */}
+              {isActiveReply && user && (
+                <div style={{ marginTop: '1rem', marginLeft: '1rem', display: 'flex', gap: '10px', background: '#f9fafb', padding: '10px', borderRadius: '6px' }}>
                   <input 
                     className="input-field"
-                    placeholder="Write a reply..." 
-                    value={replyContent[review.id] || ''}
-                    onChange={(e) => setReplyContent({ ...replyContent, [review.id]: e.target.value })}
-                    style={{ flex: 1, padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '4px' }}
+                    placeholder={`Reply to ${rUser.username || 'this review'}...`}
+                    value={replyContent[reviewId] || ''}
+                    onChange={(e) => setReplyContent({ ...replyContent, [reviewId]: e.target.value })}
+                    style={{ flex: 1, padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '4px', background:'white' }}
                   />
                   <button 
-                    onClick={(e) => handleSubmit(e, review.id)}
+                    onClick={(e) => handleSubmit(e, reviewId)}
                     style={{ background: '#2563eb', color: 'white', border: 'none', padding: '0 1rem', borderRadius: '4px', cursor: 'pointer' }}
                   >
-                    Post
+                    Post Reply
                   </button>
                 </div>
               )}
 
               {/* --- NESTED REPLIES DISPLAY --- */}
               {replies.length > 0 && (
-                <div style={{ marginTop: '1rem', marginLeft: '2rem', paddingLeft: '1rem', borderLeft: '3px solid #f3f4f6' }}>
+                <div style={{ marginTop: '1rem', marginLeft: '1.5rem', paddingLeft: '1rem', borderLeft: '2px solid #e5e7eb' }}>
                   {replies.map((reply) => {
                     const repData = reply.attributes || reply;
                     const repUser = repData.user?.data?.attributes || repData.user || {};
                     return (
-                      <div key={reply.id} style={{ marginBottom: '0.8rem' }}>
-                        <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#111827' }}>
+                      <div key={reply.id} style={{ marginBottom: '1rem', background: '#f9fafb', padding: '0.8rem', borderRadius: '6px' }}>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#111827', marginBottom:'4px' }}>
                           {repUser.username || repData.authorName || 'User'} 
-                          <span style={{ fontWeight: 'normal', color: '#6b7280', marginLeft: '5px', fontSize: '0.75rem' }}>
-                            • {new Date(repData.createdAt).toLocaleDateString()}
+                          <span style={{ fontWeight: 'normal', color: '#6b7280', marginLeft: '8px', fontSize: '0.75rem' }}>
+                            {new Date(repData.createdAt).toLocaleDateString()}
                           </span>
                         </div>
-                        <p style={{ margin: '2px 0', fontSize: '0.9rem', color: '#4b5563' }}>{repData.content}</p>
+                        <p style={{ margin: '0', fontSize: '0.9rem', color: '#4b5563', lineHeight:'1.4' }}>{repData.content}</p>
                       </div>
                     );
                   })}
