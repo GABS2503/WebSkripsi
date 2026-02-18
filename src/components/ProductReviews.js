@@ -48,11 +48,11 @@ export default function ProductReviews({ itemId, itemType }) {
       query.append(`filters[${filterField}][documentId][$eq]`, itemId);
       query.append('sort', 'createdAt:desc');
       
-      // 2. POPULATE (Use object syntax to prevent 400 errors)
+      // 2. POPULATE (Reverted to the syntax that gave you Status 200)
       query.append('populate[user]', '*');
       query.append('populate[media]', '*');
       query.append('populate[parent]', '*'); 
-      // Important: Populate the user inside the replies
+      // This specific syntax worked in your previous screenshot (d64545)
       query.append('populate[replies][populate][user]', '*'); 
       
       const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/reviews?${query.toString()}`);
@@ -60,21 +60,23 @@ export default function ProductReviews({ itemId, itemType }) {
       
       console.log("DEBUG: All Loaded Reviews", allReviews);
 
-      // 3. AGGRESSIVE CLIENT-SIDE FILTERING
+      // 3. AGGRESSIVE FILTERING
+      // We must check if 'parent' exists. If it does, it's a reply -> Hide it.
       const topLevelReviews = allReviews.filter(r => {
         const rData = r.attributes || r;
-        
-        // Check for parent in every possible location
-        const parentObj = rData.parent;
-        const parentData = parentObj?.data || parentObj;
-        
-        // Does a parent exist?
-        // We check for ID, documentId, or just if the object is not null
-        const hasParent = parentData && (parentData.id || parentData.documentId);
+        const parent = rData.parent;
 
-        // If it has a parent, it is a REPLY. 
-        // We return FALSE to hide it from the main list.
-        return !hasParent;
+        // If parent is null or undefined, keep it (Main Review)
+        if (!parent) return true;
+        
+        // Strapi v4: parent might be { data: null }
+        if (parent.data === null) return true;
+
+        // Strapi v5/v4: If parent has data (ID, Attributes, etc), it is a REPLY.
+        // So we return FALSE to remove it from this list.
+        if (parent.data || parent.id || parent.documentId) return false;
+
+        return true; 
       });
 
       setReviews(topLevelReviews);
@@ -105,7 +107,6 @@ export default function ProductReviews({ itemId, itemType }) {
       const token = localStorage.getItem('token');
       let mediaId = null;
 
-      // Upload Image logic
       if (!parentId && media) {
         const formData = new FormData();
         formData.append('files', media);
@@ -115,7 +116,6 @@ export default function ProductReviews({ itemId, itemType }) {
         mediaId = uploadRes.data[0]?.id || uploadRes.data.id;
       }
 
-      // Payload Construction
       const payloadData = {
           content: content,
           user: user.id,
@@ -124,7 +124,7 @@ export default function ProductReviews({ itemId, itemType }) {
 
       if (parentId) {
           payloadData.parent = parentId;
-          payloadData.rating = 5; // Dummy rating for replies
+          payloadData.rating = 5; 
       } else {
           payloadData.rating = rating;
       }
@@ -135,7 +135,6 @@ export default function ProductReviews({ itemId, itemType }) {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      // Reset UI
       if (parentId) {
         setReplyContent({ ...replyContent, [parentId]: '' });
         setActiveReplyId(null);
