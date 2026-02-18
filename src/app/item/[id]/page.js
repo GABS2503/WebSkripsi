@@ -6,17 +6,12 @@ import Link from 'next/link';
 import Script from 'next/script';
 import ProductReviews from '@/components/ProductReviews';
 
-// --- 1. SMART IMAGE HELPER (Prevents Double URLs) ---
+// --- SMART IMAGE HELPER ---
 const getImageUrl = (url) => {
-  if (!url) return '/placeholder.png'; // Ensure you have a placeholder.png in public folder
-  
-  // If the URL is already a full link (Cloudinary, AWS, or already has http), use it as is
+  if (!url) return '/placeholder.png';
   if (url.startsWith('http') || url.startsWith('//')) {
     return url;
   }
-  
-  // Otherwise, prepend the Backend URL
-  // We use || to default to localhost if the env var is missing
   const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:1337';
   return `${baseUrl}${url}`;
 };
@@ -44,6 +39,7 @@ export default function ItemDetails() {
         const token = localStorage.getItem('token');
         const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
         
+        // Ensure we populate seller to get the keys
         const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/${endpoint}/${id}?populate=*`, config);
         
         console.log("Full Item Data:", res.data.data);
@@ -174,12 +170,16 @@ export default function ItemDetails() {
   const data = item.attributes || item;
   const sellerRaw = data.seller?.data?.attributes || data.seller || {};
   const sellerName = sellerRaw.shopName || sellerRaw.username || "Unknown Seller";
+  
+  // --- 1. DYNAMIC CLIENT KEY EXTRACTION ---
+  // If seller has no key, fallback to empty string (or platform key if you have one)
+  const sellerClientKey = sellerRaw.midtransClientKey || sellerRaw.midtrans_client_key || "";
+
   const variants = data.variantData || [];
   const attributes = data.customAttributes || [];
   const maxStock = data.stock || 999;
   const isOutOfStock = type === 'product' && maxStock < 1;
 
-  // --- 2. UPDATED MEDIA LIST TO USE HELPER ---
   const getMediaList = (mediaField) => {
     if (!mediaField) return [];
     const unwrapped = mediaField.data || mediaField;
@@ -189,7 +189,6 @@ export default function ItemDetails() {
       if (!finalData?.url) return null;
       return {
         id: item.id,
-        // USE HELPER HERE instead of manual template literal
         url: getImageUrl(finalData.url), 
         isVideo: finalData.mime?.startsWith('video/')
       };
@@ -254,7 +253,6 @@ export default function ItemDetails() {
               {data.description || "No description provided."}
             </p>
 
-            {/* ATTRIBUTES */}
             {attributes.length > 0 && (
               <div style={{ margin: '1.5rem 0' }}>
                 <h4 style={{ marginBottom: '0.5rem' }}>Specifications:</h4>
@@ -268,7 +266,6 @@ export default function ItemDetails() {
               </div>
             )}
 
-            {/* VARIANTS */}
             {variants.map((variant, i) => (
               <div key={i} style={{ marginBottom: '1rem' }}>
                 <div style={{ fontWeight: 'bold', marginBottom: '0.5rem' }}>{variant.name}: <span style={{fontWeight:'normal'}}>{selectedVariants[variant.name]}</span></div>
@@ -280,7 +277,6 @@ export default function ItemDetails() {
                     const isSelected = selectedVariants[variant.name] === name;
                     return (
                       <button key={idx} onClick={() => handleVariantSelect(variant.name, name)} style={{padding: '0.5rem 1rem', border: isSelected ? '2px solid #e77600' : '1px solid #d1d5db', background: isSelected ? '#fff4e3' : 'white', borderRadius: '4px', cursor: 'pointer', fontWeight: isSelected ? 'bold' : 'normal', display: 'flex', alignItems: 'center', gap: '8px'}}>
-                        {/* 3. USE HELPER HERE TOO */}
                         {image && <img src={getImageUrl(image.url)} alt={name} style={{width:'24px', height:'24px', objectFit:'cover', borderRadius:'4px', border:'1px solid #eee'}} />}
                         {name}
                       </button>
@@ -290,7 +286,6 @@ export default function ItemDetails() {
               </div>
             ))}
 
-            {/* ACTION BUTTONS */}
             <div style={{ marginTop: '2rem', padding: '1.5rem', border: '1px solid #d1d5db', borderRadius: '8px', background: '#f9fafb' }}>
               {isOutOfStock ? (
                 <h3 style={{ color: '#ef4444', marginTop:0 }}>Currently Unavailable</h3>
@@ -316,11 +311,15 @@ export default function ItemDetails() {
 
       </main>
 
-      <Script 
-        src="https://app.sandbox.midtrans.com/snap/snap.js"
-        data-client-key={process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY} // Best practice: use Env Var for key too
-        strategy="lazyOnload" 
-      />
+      {/* --- 2. DYNAMICALLY LOAD SCRIPT --- */}
+      {/* We only render the script if we have the Seller's Key */}
+      {sellerClientKey && (
+        <Script 
+          src="https://app.sandbox.midtrans.com/snap/snap.js"
+          data-client-key={sellerClientKey}
+          strategy="lazyOnload" 
+        />
+      )}
     </div>
   );
 }
