@@ -1,5 +1,6 @@
 import './globals.css';
-import AccessibilityToolbar from '../components/AccessibilityToolbar'; // <--- Import here
+import AccessibilityToolbar from '../components/AccessibilityToolbar'; 
+import { CartProvider } from '@/context/CartContext'; // Import CartProvider
 
 export const metadata = {
   title: 'MSME Market',
@@ -10,8 +11,10 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body>
-        {children}
-        <AccessibilityToolbar /> {/* <--- Add this line here */}
+        <CartProvider>
+          {children}
+          <AccessibilityToolbar />
+        </CartProvider>
       </body>
     </html>
   );
