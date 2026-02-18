@@ -2,18 +2,21 @@ import { NextResponse } from 'next/server';
 import Midtrans from 'midtrans-client';
 import axios from 'axios';
 
-// Ensure this matches your actual Strapi Token
 const STRAPI_API_TOKEN = "cb1b2d1a1ab9410f6da4a4d7b31592920434f4fbab398b4075610d808efe42e524e128822d68556909f808ab6d8a1cbfcaef7feb0926dcf15bb96171ca0416fca46231090980dad26b964be5d152520e242ffe5c8157871298463dfe52cd80278acfc5d9e5ad53266ac7316402d1aa575d0a35e4f773e3079810a579ce801104"; 
 
 export async function POST(request) {
   try {
-    // 1. EXTRACT DATA
-    const { id, price, name, quantity, type, details } = await request.json();
+    const body = await request.json();
+    const { id, price, name, quantity, type, details } = body;
 
-    // 2. SETUP SERVER KEY (Use your specific server key)
+    // --- DEBUGGING LOGS (Look at your Terminal!) ---
+    console.log("Payment Request Received!");
+    console.log("Type:", type);
+    console.log("ID:", id);
+    // -----------------------------------------------
+
     let serverKey = "Mid-server-3YJHL09y2ys1sTEuPuS0aLgm";
 
-    // 3. INITIALIZE MIDTRANS
     let snap = new Midtrans.Snap({
       isProduction: false,
       serverKey: serverKey
@@ -22,15 +25,11 @@ export async function POST(request) {
     const orderId = `ORDER-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     let parameter = {};
 
-    // --- CRITICAL FIX: CHECK IF THIS IS A CART CHECKOUT ---
-
+    // === CART CHECKOUT LOGIC ===
     if (type === 'cart_checkout') {
-      // === CASE A: CART CHECKOUT ===
-      // We DO NOT check the database because 'id' is a random cart ID (e.g. CART-123).
-      // We trust the data sent from the frontend.
-      
-      console.log("Processing Cart Checkout...");
+      console.log("✅ PROCESSING AS CART CHECKOUT (Skipping DB Check)");
 
+      // Prepare items for Midtrans
       const itemDetails = details ? details.map(item => ({
           id: String(item.id).substring(0, 50),
           price: parseInt(item.price),
@@ -53,11 +52,10 @@ export async function POST(request) {
         credit_card: { secure: true }
       };
 
-    } else {
-      // === CASE B: SINGLE ITEM BUY (Validation Mode) ===
-      // Here we DO check the database to ensure the price is correct (Security).
-      
-      console.log("Processing Single Item Checkout...");
+    } 
+    // === SINGLE ITEM LOGIC ===
+    else {
+      console.log("⚠️ PROCESSING AS SINGLE ITEM (Checking DB)");
       
       const apiUrl = process.env.NEXT_PUBLIC_API_URL;
       const endpoint = type === 'service' ? 'services' : 'products';
@@ -76,12 +74,11 @@ export async function POST(request) {
       
       const itemData = strapiRes.data.data[0]; 
 
-      // If item is missing in DB, return 404
       if (!itemData) {
+        console.error("❌ ITEM NOT FOUND IN STRAPI");
         return NextResponse.json({ error: `${type} not found (404)` }, { status: 404 });
       }
 
-      // Safe Math for Midtrans
       const qty = quantity || 1;
       const unitPrice = Math.round(price / qty); 
       const safeGrossAmount = unitPrice * qty;
@@ -102,13 +99,11 @@ export async function POST(request) {
       };
     }
 
-    // 4. CREATE TRANSACTION
     const transaction = await snap.createTransaction(parameter);
     return NextResponse.json({ token: transaction.token });
 
   } catch (err) {
-    console.error("Payment API Error:", err);
-    // Return a 500 error with the message so the frontend can display it
+    console.error("🔥 Payment API Error:", err);
     const msg = err.ApiResponse?.error_messages?.[0] || err.message;
     return NextResponse.json({ error: `Payment Failed: ${msg}` }, { status: 500 });
   }
