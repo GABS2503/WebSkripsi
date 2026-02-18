@@ -1,4 +1,3 @@
-// src/app/cart/page.js
 "use client";
 import { useCart } from '@/context/CartContext';
 import { useState, useEffect } from 'react';
@@ -7,21 +6,20 @@ import Script from 'next/script';
 import Link from 'next/link';
 
 export default function CartPage() {
-  const { cart, removeFromCart, clearCart } = useCart();
+  const { cart, removeFromCart } = useCart();
   const [groupedItems, setGroupedItems] = useState({});
-  
-  // State to track which Seller's Key to load currently
   const [activeClientKey, setActiveClientKey] = useState("");
 
-  // Group items by Seller ID when cart changes
   useEffect(() => {
     const groups = {};
     cart.forEach(item => {
-      const sellerId = item.seller?.id || 'unknown';
+      // Handle both v4 (id) and v5 (documentId) seller structures
+      const sellerId = item.seller?.id || item.seller?.documentId || 'unknown';
+      
       if (!groups[sellerId]) {
         groups[sellerId] = {
           sellerName: item.seller?.shopName || item.seller?.username || 'Unknown Shop',
-          clientKey: item.seller?.midtransClientKey, // Get the dynamic key
+          clientKey: item.seller?.midtransClientKey || item.seller?.midtrans_client_key,
           items: []
         };
       }
@@ -30,47 +28,37 @@ export default function CartPage() {
     setGroupedItems(groups);
   }, [cart]);
 
-  // Handle Payment for a specific Seller Group
   const handlePaySeller = async (sellerId, groupData) => {
     const { items, clientKey } = groupData;
     
     if (!clientKey) {
-      alert("This seller has not set up payments yet.");
+      alert("This seller currently cannot accept payments (Missing Key).");
       return;
     }
 
-    // Set the active key so the Script tag updates
     setActiveClientKey(clientKey);
 
-    // Calculate total for this seller
     const totalAmount = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    
-    // Create a composite name for the order
     const orderName = `Order from ${groupData.sellerName} (${items.length} items)`;
 
     try {
-      // 1. Get Token from Backend
-      // We send a generic ID (like 0) because this is a custom cart order
-      // You might need to update your backend to handle "custom" carts or just send the first item's ID
+      // --- HERE IS THE FIX: Ensure type is EXACTLY 'cart_checkout' ---
       const res = await axios.post('/api/payment', { 
-        id: "cart_order", // Dummy ID
+        id: `CART-${Date.now()}`, 
         price: totalAmount, 
         name: orderName,
-        type: 'cart',
-        // Optional: Send full breakdown to backend if you update backend to support it
-        details: items 
+        type: 'cart_checkout', // <--- THIS IS CRITICAL
+        details: items // Send the items so backend can list them
       });
 
       const token = res.data.token;
 
-      // 2. Trigger Snap
-      // We give a short delay to ensure the Client Key Script has loaded
       setTimeout(() => {
+        // @ts-ignore
         if (window.snap) {
           window.snap.pay(token, {
             onSuccess: function(result) {
               alert("Payment Success!");
-              // Remove these specific items from cart
               items.forEach(i => removeFromCart(i.uniqueId));
             },
             onPending: function(result) { alert("Waiting for payment..."); },
@@ -81,7 +69,8 @@ export default function CartPage() {
 
     } catch (err) {
       console.error(err);
-      alert("Payment initiation failed.");
+      // Alert the exact error from backend
+      alert(err.response?.data?.error || "Payment initiation failed.");
     }
   };
 
@@ -89,65 +78,64 @@ export default function CartPage() {
 
   return (
     <div style={{ background: '#f3f4f6', minHeight: '100vh', padding: '2rem' }}>
-      <h1>Your Cart</h1>
-      
-      {cart.length === 0 ? (
-        <p>Your cart is empty. <Link href="/">Go Shopping</Link></p>
-      ) : (
-        <div style={{maxWidth: '800px', margin: '0 auto'}}>
-          
-          <div style={{background:'white', padding:'20px', borderRadius:'8px', marginBottom:'2rem', textAlign:'right'}}>
-            <h3>Grand Total: <span style={{color:'#B12704'}}>Rp {grandTotal.toLocaleString()}</span></h3>
+      <div className="container" style={{maxWidth:'800px', margin:'0 auto'}}>
+        <h1 style={{marginBottom:'2rem'}}>Your Cart</h1>
+        
+        {cart.length === 0 ? (
+          <div style={{textAlign:'center', padding:'3rem', background:'white', borderRadius:'8px'}}>
+            <h3>Your cart is empty.</h3>
+            <Link href="/" style={{color:'#2563eb', fontWeight:'bold'}}>Go Shopping &rarr;</Link>
           </div>
-
-          {/* Render Groups */}
-          {Object.entries(groupedItems).map(([sellerId, group]) => (
-            <div key={sellerId} style={{ background: 'white', padding: '1.5rem', borderRadius: '8px', marginBottom: '2rem', border: '1px solid #ddd' }}>
-              <h3 style={{borderBottom:'1px solid #eee', paddingBottom:'10px'}}>
-                Store: {group.sellerName}
-              </h3>
-
-              {group.items.map((item) => (
-                <div key={item.uniqueId} style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', borderBottom: '1px solid #f0f0f0', paddingBottom: '1rem' }}>
-                  <img src={item.image} style={{width:'80px', height:'80px', objectFit:'cover', borderRadius:'4px'}} />
-                  <div style={{flex:1}}>
-                    <h4 style={{margin:0}}>{item.name}</h4>
-                    <p style={{color:'#666', fontSize:'0.9rem', margin:'5px 0'}}>
-                        {item.type} | Qty: {item.quantity} | 
-                        <b> Option: {item.selectedOptions.deliveryType}</b>
-                    </p>
-                    <p style={{fontSize:'0.85rem', color:'#555'}}>
-                        Info: {item.customerInfo.name} 
-                        {item.customerInfo.address && ` - ${item.customerInfo.address}`}
-                    </p>
-                  </div>
-                  <div style={{textAlign:'right'}}>
-                    <div style={{fontWeight:'bold'}}>Rp {(item.price * item.quantity).toLocaleString()}</div>
-                    <button onClick={() => removeFromCart(item.uniqueId)} style={{color:'red', background:'none', border:'none', cursor:'pointer', fontSize:'0.8rem'}}>Remove</button>
-                  </div>
-                </div>
-              ))}
-
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:'1rem' }}>
-                <div>
-                    <strong>Subtotal: Rp {group.items.reduce((s, i)=>s+(i.price*i.quantity),0).toLocaleString()}</strong>
-                </div>
-                <button 
-                    onClick={() => handlePaySeller(sellerId, group)}
-                    className="btn-primary"
-                    style={{padding:'10px 20px', borderRadius:'6px'}}
-                >
-                    Checkout from {group.sellerName}
-                </button>
-              </div>
+        ) : (
+          <>
+            <div style={{background:'white', padding:'20px', borderRadius:'8px', marginBottom:'2rem', textAlign:'right', border:'1px solid #ddd'}}>
+              <h3>Grand Total: <span style={{color:'#B12704'}}>Rp {grandTotal.toLocaleString()}</span></h3>
             </div>
-          ))}
 
-        </div>
-      )}
+            {Object.entries(groupedItems).map(([sellerId, group]) => (
+              <div key={sellerId} style={{ background: 'white', padding: '1.5rem', borderRadius: '8px', marginBottom: '2rem', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
+                <div style={{borderBottom:'1px solid #eee', paddingBottom:'10px', marginBottom:'1rem'}}>
+                  <h3 style={{margin:0}}>Store: {group.sellerName}</h3>
+                </div>
 
-      {/* DYNAMIC SCRIPT LOADER */}
-      {/* This loads the Midtrans script for the specific seller you are currently paying */}
+                {group.items.map((item) => (
+                  <div key={item.uniqueId} style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', borderBottom: '1px solid #f9f9f9', paddingBottom: '1rem' }}>
+                    <img src={item.image} style={{width:'80px', height:'80px', objectFit:'cover', borderRadius:'4px', background:'#eee'}} />
+                    <div style={{flex:1}}>
+                      <h4 style={{margin:0, fontSize:'1.1rem'}}>{item.name}</h4>
+                      <div style={{color:'#666', fontSize:'0.9rem', margin:'5px 0'}}>
+                          {item.type.toUpperCase()} | Qty: {item.quantity} 
+                      </div>
+                      <div style={{fontSize:'0.85rem', color:'#059669', background:'#ecfdf5', display:'inline-block', padding:'2px 8px', borderRadius:'4px'}}>
+                          Option: <b>{item.selectedOptions?.deliveryType || "Standard"}</b>
+                      </div>
+                    </div>
+                    <div style={{textAlign:'right'}}>
+                      <div style={{fontWeight:'bold', color:'#B12704'}}>Rp {(item.price * item.quantity).toLocaleString()}</div>
+                      <button onClick={() => removeFromCart(item.uniqueId)} style={{color:'red', background:'none', border:'none', cursor:'pointer', fontSize:'0.8rem', marginTop:'10px', textDecoration:'underline'}}>Remove</button>
+                    </div>
+                  </div>
+                ))}
+
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:'1.5rem', paddingTop:'1rem', borderTop:'1px solid #eee' }}>
+                  <div>
+                      <span>Subtotal:</span><br/>
+                      <strong style={{fontSize:'1.2rem'}}>Rp {group.items.reduce((s, i)=>s+(i.price*i.quantity),0).toLocaleString()}</strong>
+                  </div>
+                  <button 
+                      onClick={() => handlePaySeller(sellerId, group)}
+                      className="btn-primary"
+                      style={{padding:'10px 20px', borderRadius:'6px'}}
+                  >
+                      Checkout {group.items.length} Items
+                  </button>
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+
       {activeClientKey && (
         <Script 
           src="https://app.sandbox.midtrans.com/snap/snap.js"
