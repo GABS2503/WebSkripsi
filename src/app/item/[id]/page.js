@@ -3,8 +3,8 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import Script from 'next/script';
 import ProductReviews from '@/components/ProductReviews';
+import { useCart } from '@/context/CartContext'; // Import Cart Hook
 
 // --- SMART IMAGE HELPER ---
 const getImageUrl = (url) => {
@@ -17,6 +17,7 @@ const getImageUrl = (url) => {
 };
 
 export default function ItemDetails() {
+  const { addToCart } = useCart(); // Use Cart Hook
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
@@ -31,6 +32,10 @@ export default function ItemDetails() {
   const [selectedVariants, setSelectedVariants] = useState({}); 
   const [activeImageIndex, setActiveImageIndex] = useState(0);
 
+  // --- NEW STATE FOR OPTIONS ---
+  const [deliveryType, setDeliveryType] = useState(''); // 'pickup', 'shipping', 'onsite', 'home_service'
+  const [customerInfo, setCustomerInfo] = useState({ name: '', address: '' });
+
   useEffect(() => {
     const fetchData = async () => {
       if (!id) return;
@@ -39,10 +44,7 @@ export default function ItemDetails() {
         const token = localStorage.getItem('token');
         const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
         
-        // Ensure we populate seller to get the keys
         const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/${endpoint}/${id}?populate=*`, config);
-        
-        console.log("Full Item Data:", res.data.data);
         setItem(res.data.data);
       } catch (error) {
         console.error("Error loading item", error);
@@ -69,7 +71,6 @@ export default function ItemDetails() {
 
     let sellerId = null;
     let itemName = "Item";
-
     const extractId = (obj) => obj?.data?.id || obj?.id;
 
     if (item) {
@@ -84,7 +85,7 @@ export default function ItemDetails() {
     }
 
     if (!sellerId) {
-      alert("Error: Could not read Seller ID. Please check console for details.");
+      alert("Error: Could not read Seller ID.");
       return;
     }
 
@@ -95,25 +96,20 @@ export default function ItemDetails() {
 
     try {
       const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/conversations`, {
-        data: {
-          users: [currentUser.id, sellerId],
-          itemTitle: itemName
-        }
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+        data: { users: [currentUser.id, sellerId], itemTitle: itemName }
+      }, { headers: { Authorization: `Bearer ${token}` } });
 
       const convId = res.data.data.documentId || res.data.data.id;
       router.push(`/chat?id=${convId}`);
-
     } catch (err) {
       console.error(err);
-      alert("Could not start chat. Ensure 'Conversation' collection exists.");
+      alert("Could not start chat.");
     }
   };
 
-  const handleBuy = async () => {
-    const price = item?.price || item?.attributes?.price;
+  // --- NEW: ADD TO CART HANDLER ---
+  const handleAddToCart = () => {
+    // 1. Validation
     const name = item?.name || item?.attributes?.name;
     const variantData = item?.variantData || item?.attributes?.variantData || [];
 
@@ -125,43 +121,44 @@ export default function ItemDetails() {
       }
     }
 
-    try {
-      const correctId = item.documentId || item.id;
-
-      const res = await axios.post('/api/payment', { 
-        id: correctId, 
-        price: (price * quantity), 
-        name: `${name} (x${quantity})`,
-        type: type 
-      });
-
-      const token = res.data.token;
-      if (!token) throw new Error("No token received from backend");
-
-      // @ts-ignore
-      window.snap.pay(token, {
-        onSuccess: function(result) {
-          console.log("Payment Success:", result);
-          alert("Payment Successful! Thank you for your purchase.");
-        },
-        onPending: function(result) {
-          console.log("Payment Pending:", result);
-          alert("Payment Pending! Please complete the payment via your selected method.");
-        },
-        onError: function(result) {
-          console.log("Payment Error:", result);
-          alert("Payment Failed. Please try again.");
-        },
-        onClose: function() {
-          alert("You closed the payment popup without finishing.");
-        }
-      });
-
-    } catch (err) {
-      console.error("Payment Error:", err);
-      const errorMessage = err.response?.data?.error || "Payment Failed";
-      alert(`Error: ${errorMessage}`);
+    if (!deliveryType) {
+      alert("Please select a delivery/service option.");
+      return;
     }
+    if (!customerInfo.name) {
+      alert("Please enter your name.");
+      return;
+    }
+    // Require address only if delivery or home service is selected
+    if ((deliveryType === 'shipping' || deliveryType === 'home_service') && !customerInfo.address) {
+      alert("Please enter your address for delivery.");
+      return;
+    }
+
+    // 2. Prepare Data
+    const data = item.attributes || item;
+    const price = data.price;
+    const media = data.media?.data || data.media || [];
+    const imageUrl = getImageUrl(media[0]?.attributes?.url || media[0]?.url);
+    const seller = data.seller?.data?.attributes || data.seller;
+
+    const cartPayload = {
+        id: item.documentId || item.id,
+        name: name,
+        price: price,
+        image: imageUrl,
+        seller: seller, // Important for split payments
+        type: type,
+        quantity: quantity
+    };
+
+    const options = {
+        variants: selectedVariants,
+        deliveryType: deliveryType
+    };
+
+    // 3. Add to Context
+    addToCart(cartPayload, options, customerInfo);
   };
 
   if (loading) return <div className="container" style={{padding:'2rem', textAlign:'center'}}>Loading...</div>;
@@ -170,11 +167,6 @@ export default function ItemDetails() {
   const data = item.attributes || item;
   const sellerRaw = data.seller?.data?.attributes || data.seller || {};
   const sellerName = sellerRaw.shopName || sellerRaw.username || "Unknown Seller";
-  
-  // --- 1. DYNAMIC CLIENT KEY EXTRACTION ---
-  // If seller has no key, fallback to empty string (or platform key if you have one)
-  const sellerClientKey = sellerRaw.midtransClientKey || sellerRaw.midtrans_client_key || "";
-
   const variants = data.variantData || [];
   const attributes = data.customAttributes || [];
   const maxStock = data.stock || 999;
@@ -202,7 +194,10 @@ export default function ItemDetails() {
     <div style={{ background: '#f3f4f6', minHeight: '100vh' }}>
       <nav className="navbar">
         <h1 style={{ margin:0 }}>MSME Market</h1>
-        <Link href="/" style={{color:'white', textDecoration:'none', fontWeight:'bold'}}>&larr; Back</Link>
+        <div style={{display:'flex', gap:'20px'}}>
+            <Link href="/cart" style={{color:'white', fontWeight:'bold', textDecoration:'none'}}>🛒 Cart</Link>
+            <Link href="/" style={{color:'white', textDecoration:'none', fontWeight:'bold'}}>&larr; Back</Link>
+        </div>
       </nav>
 
       <main className="container" style={{ marginTop: '2rem' }}>
@@ -286,7 +281,7 @@ export default function ItemDetails() {
               </div>
             ))}
 
-            <div style={{ marginTop: '2rem', padding: '1.5rem', border: '1px solid #d1d5db', borderRadius: '8px', background: '#f9fafb' }}>
+            <div style={{ marginTop: '2rem', padding: '1.5rem', border: '1px solid #d1d5db', borderRadius: '8px', background: 'white', boxShadow:'0 2px 5px rgba(0,0,0,0.05)' }}>
               {isOutOfStock ? (
                 <h3 style={{ color: '#ef4444', marginTop:0 }}>Currently Unavailable</h3>
               ) : (
@@ -299,8 +294,72 @@ export default function ItemDetails() {
                   </div>
                   {type === 'product' && <div style={{ color: '#166534', fontWeight: 'bold', fontSize: '0.9rem', marginBottom: '1rem' }}>{maxStock > 10 ? 'In Stock' : `Only ${maxStock} left in stock - order soon`}</div>}
 
+                  <hr style={{margin:'1.5rem 0', borderColor:'#eee'}}/>
+
+                  {/* --- DELIVERY / SERVICE OPTIONS --- */}
+                  <div style={{ marginBottom: '1rem' }}>
+                    <label style={{fontWeight:'bold', display:'block', marginBottom:'0.5rem'}}>
+                        {type === 'product' ? 'Collection Method:' : 'Service Location:'}
+                    </label>
+                    <div style={{display:'flex', gap:'10px', flexDirection:'column'}}>
+                        {type === 'product' ? (
+                            <>
+                                <label style={{cursor:'pointer', display:'flex', gap:'8px', alignItems:'center'}}>
+                                    <input type="radio" name="del_opt" value="pickup" onChange={(e)=>setDeliveryType(e.target.value)} /> 
+                                    🏪 Buy in Place (Pickup)
+                                </label>
+                                <label style={{cursor:'pointer', display:'flex', gap:'8px', alignItems:'center'}}>
+                                    <input type="radio" name="del_opt" value="shipping" onChange={(e)=>setDeliveryType(e.target.value)} /> 
+                                    🚚 Take Away (Delivery)
+                                </label>
+                            </>
+                        ) : (
+                            <>
+                                <label style={{cursor:'pointer', display:'flex', gap:'8px', alignItems:'center'}}>
+                                    <input type="radio" name="del_opt" value="onsite" onChange={(e)=>setDeliveryType(e.target.value)} /> 
+                                    🚶 I go to Seller
+                                </label>
+                                <label style={{cursor:'pointer', display:'flex', gap:'8px', alignItems:'center'}}>
+                                    <input type="radio" name="del_opt" value="home_service" onChange={(e)=>setDeliveryType(e.target.value)} /> 
+                                    🏠 Seller comes to Me
+                                </label>
+                            </>
+                        )}
+                    </div>
+                  </div>
+
+                  {/* --- CUSTOMER INFO FORM --- */}
+                  {deliveryType && (
+                    <div style={{ background:'#f9fafb', padding:'15px', borderRadius:'6px', marginBottom:'1.5rem', border:'1px solid #e5e7eb' }}>
+                        <div style={{marginBottom:'10px'}}>
+                            <label style={{fontSize:'0.9rem', fontWeight:'bold'}}>Your Name</label>
+                            <input 
+                                type="text" 
+                                placeholder="Enter your name"
+                                style={{width:'100%', padding:'8px', border:'1px solid #ccc', borderRadius:'4px', marginTop:'4px'}}
+                                value={customerInfo.name}
+                                onChange={(e) => setCustomerInfo({...customerInfo, name: e.target.value})}
+                            />
+                        </div>
+
+                        {/* Show Address Field ONLY if Delivery or Home Service */}
+                        {(deliveryType === 'shipping' || deliveryType === 'home_service') && (
+                            <div>
+                                <label style={{fontSize:'0.9rem', fontWeight:'bold'}}>Delivery Address</label>
+                                <textarea 
+                                    placeholder="Enter full address"
+                                    style={{width:'100%', padding:'8px', border:'1px solid #ccc', borderRadius:'4px', marginTop:'4px'}}
+                                    rows={3}
+                                    value={customerInfo.address}
+                                    onChange={(e) => setCustomerInfo({...customerInfo, address: e.target.value})}
+                                />
+                            </div>
+                        )}
+                    </div>
+                  )}
+
                   <button onClick={handleChat} style={{ width: '100%', borderRadius: '20px', padding: '0.8rem', background: 'white', border: '1px solid #d1d5db', marginBottom: '0.8rem', cursor: 'pointer', fontWeight: 'bold', color: '#333' }}>Chat with Seller</button>
-                  <button onClick={handleBuy} className="btn-primary" style={{ width: '100%', borderRadius: '20px', padding: '0.8rem' }}>Buy Now</button>
+                  <button onClick={handleAddToCart} className="btn-primary" style={{ width: '100%', borderRadius: '20px', padding: '0.8rem' }}>Add to Cart</button>
                 </>
               )}
             </div>
@@ -310,16 +369,6 @@ export default function ItemDetails() {
         <ProductReviews itemId={item.documentId || item.id} itemType={type} />
 
       </main>
-
-      {/* --- 2. DYNAMICALLY LOAD SCRIPT --- */}
-      {/* We only render the script if we have the Seller's Key */}
-      {sellerClientKey && (
-        <Script 
-          src="https://app.sandbox.midtrans.com/snap/snap.js"
-          data-client-key={sellerClientKey}
-          strategy="lazyOnload" 
-        />
-      )}
     </div>
   );
 }
