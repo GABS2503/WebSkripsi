@@ -3,7 +3,7 @@ import Midtrans from 'midtrans-client';
 import axios from 'axios';
 
 // NOTE: Ideally, move this to process.env.STRAPI_API_TOKEN in Vercel variables for security
-const STRAPI_API_TOKEN = "4b7dd9b288d2086c32422661f2e10cb570d6871612c5605337e65342acf083754379ce82829276a860e75fb335ba264c223e56414e7b185cbf8d2b77b42f80a12b1d3c533c28c3e851c3ce624a2b7178314971f296aca3aba018a2dda99228f4d19de557f5722d72d6571dbaa683afa574c0bc95e095ba9f20147afba0508d71"; 
+const STRAPI_API_TOKEN = "cb1b2d1a1ab9410f6da4a4d7b31592920434f4fbab398b4075610d808efe42e524e128822d68556909f808ab6d8a1cbfcaef7feb0926dcf15bb96171ca0416fca46231090980dad26b964be5d152520e242ffe5c8157871298463dfe52cd80278acfc5d9e5ad53266ac7316402d1aa575d0a35e4f773e3079810a579ce801104"; 
 
 export async function POST(request) {
   try {
