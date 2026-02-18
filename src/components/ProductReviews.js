@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 
-// --- IMAGE HELPER ---
+// --- IMAGE HELPER (Kept this as it works well) ---
 const getImageUrl = (mediaData) => {
   if (!mediaData) return null;
   let data = mediaData;
@@ -25,8 +25,6 @@ export default function ProductReviews({ itemId, itemType }) {
   const [rating, setRating] = useState(5);
   const [media, setMedia] = useState(null);
   const [preview, setPreview] = useState(null);
-  const [replyContent, setReplyContent] = useState({}); 
-  const [activeReplyId, setActiveReplyId] = useState(null);
   const [user, setUser] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -41,39 +39,22 @@ export default function ProductReviews({ itemId, itemType }) {
 
   const fetchReviews = async () => {
     try {
-      console.log(`Fetching reviews for ${itemType} ID:`, itemId); // DEBUG LOG
-
       const filterField = itemType === 'product' ? 'product' : 'service';
       const query = new URLSearchParams();
       
-      // Filter by Document ID
+      // 1. Simple Filter
       query.append(`filters[${filterField}][documentId][$eq]`, itemId);
       query.append('sort', 'createdAt:desc');
       
-      // Populate deeply
+      // 2. Simple Populate (User and Media only)
+      // Removed 'parent' and 'replies' to prevent errors
       query.append('populate[0]', 'user');
       query.append('populate[1]', 'media');
-      query.append('populate[2]', 'parent');
-      query.append('populate[3]', 'replies.user'); 
-
+      
       const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/reviews?${query.toString()}`);
       
-      const allReviews = res.data.data;
-      console.log("DEBUG: Raw Reviews from API:", allReviews); // DEBUG LOG
-
-      // --- IMPROVED FILTER ---
-      // Only hide review if it definitely HAS a parent (is a reply)
-      const topLevelReviews = allReviews.filter(r => {
-        const rData = r.attributes || r;
-        const parent = rData.parent?.data || rData.parent;
-        
-        // If parent exists AND has an ID, it's a reply. Hide it from main list.
-        const isReply = parent && (parent.id || parent.documentId);
-        return !isReply; 
-      });
-
-      console.log("DEBUG: Visible Top Level Reviews:", topLevelReviews); // DEBUG LOG
-      setReviews(topLevelReviews);
+      // Directly set data without complex filtering
+      setReviews(res.data.data);
     } catch (err) {
       console.error("Error fetching reviews:", err);
     }
@@ -87,13 +68,12 @@ export default function ProductReviews({ itemId, itemType }) {
     }
   };
 
-  const handleSubmit = async (e, parentId = null) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!user) { alert("Please login to review"); return; }
     if (isSubmitting) return; 
 
-    const content = parentId ? replyContent[parentId] : newComment;
-    if (!content?.trim()) return;
+    if (!newComment?.trim()) return;
 
     setIsSubmitting(true);
 
@@ -101,7 +81,8 @@ export default function ProductReviews({ itemId, itemType }) {
       const token = localStorage.getItem('token');
       let mediaId = null;
 
-      if (!parentId && media) {
+      // 1. Upload Image logic
+      if (media) {
         const formData = new FormData();
         formData.append('files', media);
         const uploadRes = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/upload`, formData, {
@@ -110,35 +91,28 @@ export default function ProductReviews({ itemId, itemType }) {
         mediaId = uploadRes.data[0]?.id || uploadRes.data.id;
       }
 
+      // 2. Simple Payload
       const payloadData = {
-          content: content,
+          content: newComment,
+          rating: rating,
           user: user.id,
           [itemType === 'product' ? 'product' : 'service']: itemId
       };
 
-      if (parentId) {
-          payloadData.parent = parentId;
-          payloadData.rating = 5; 
-      } else {
-          payloadData.rating = rating;
-      }
-
       if (mediaId) payloadData.media = mediaId;
 
+      // 3. Post to Strapi
       await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/reviews`, { data: payloadData }, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      if (parentId) {
-        setReplyContent({ ...replyContent, [parentId]: '' });
-        setActiveReplyId(null);
-      } else {
-        setNewComment('');
-        setMedia(null);
-        setPreview(null);
-        setRating(5);
-      }
+      // 4. Reset Form
+      setNewComment('');
+      setMedia(null);
+      setPreview(null);
+      setRating(5);
       
+      // 5. Refresh List
       setTimeout(() => fetchReviews(), 500);
 
     } catch (err) {
@@ -161,7 +135,7 @@ export default function ProductReviews({ itemId, itemType }) {
 
       {/* --- FORM --- */}
       {user ? (
-        <form onSubmit={(e) => handleSubmit(e)} style={{ marginBottom: '2rem', background: '#f9fafb', padding: '1.5rem', borderRadius: '8px' }}>
+        <form onSubmit={handleSubmit} style={{ marginBottom: '2rem', background: '#f9fafb', padding: '1.5rem', borderRadius: '8px' }}>
           <div style={{ marginBottom: '1rem' }}>
             <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.5rem' }}>Rating</label>
             <div style={{ display: 'flex', gap: '5px' }}>
@@ -191,7 +165,7 @@ export default function ProductReviews({ itemId, itemType }) {
         <div style={{ padding: '1rem', background: '#eff6ff', color: '#1e40af', borderRadius: '6px', marginBottom: '2rem' }}>Please <a href="/login" style={{ fontWeight: 'bold', textDecoration: 'underline' }}>log in</a> to write a review.</div>
       )}
 
-      {/* --- REVIEWS LIST --- */}
+      {/* --- REVIEWS LIST (Linear, No Nesting) --- */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         {reviews.length === 0 && <p style={{ color: '#6b7280' }}>No reviews yet. Be the first!</p>}
         
@@ -199,22 +173,11 @@ export default function ProductReviews({ itemId, itemType }) {
           const rData = review.attributes || review;
           const rUser = rData.user?.data?.attributes || rData.user || {};
           const rMediaUrl = getImageUrl(rData.media);
-          
           const reviewId = review.documentId || review.id;
-          const isActiveReply = activeReplyId === reviewId;
-
-          // SORT REPLIES: Oldest First
-          let replies = rData.replies?.data || rData.replies || [];
-          if (Array.isArray(replies)) {
-             replies = [...replies].sort((a, b) => {
-                const dateA = new Date(a.attributes?.createdAt || a.createdAt);
-                const dateB = new Date(b.attributes?.createdAt || b.createdAt);
-                return dateA - dateB;
-             });
-          }
 
           return (
             <div key={reviewId} style={{ borderBottom: '1px solid #e5e7eb', paddingBottom: '1.5rem' }}>
+              
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <div style={{ width: '35px', height: '35px', background: '#3b82f6', color: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
@@ -228,14 +191,6 @@ export default function ProductReviews({ itemId, itemType }) {
                 
                 <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: '0.8rem', color: '#9ca3af' }}>{new Date(rData.createdAt).toLocaleDateString()}</div>
-                    {user && (
-                        <button 
-                        onClick={() => setActiveReplyId(isActiveReply ? null : reviewId)}
-                        style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.85rem', cursor: 'pointer', padding: 0, marginTop: '4px' }}
-                        >
-                        {isActiveReply ? 'Cancel' : 'Reply'}
-                        </button>
-                    )}
                 </div>
               </div>
 
@@ -247,45 +202,6 @@ export default function ProductReviews({ itemId, itemType }) {
                   alt="Review attachment" 
                   style={{ maxWidth: '150px', maxHeight: '150px', borderRadius: '6px', marginTop: '0.5rem', border: '1px solid #eee', display: 'block' }} 
                 />
-              )}
-
-              {isActiveReply && user && (
-                <div style={{ marginTop: '1rem', marginLeft: '1rem', display: 'flex', gap: '10px', background: '#f9fafb', padding: '10px', borderRadius: '6px' }}>
-                  <input 
-                    className="input-field"
-                    placeholder={`Reply to ${rUser.username || 'this review'}...`}
-                    value={replyContent[reviewId] || ''}
-                    onChange={(e) => setReplyContent({ ...replyContent, [reviewId]: e.target.value })}
-                    style={{ flex: 1, padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '4px', background:'white' }}
-                  />
-                  <button 
-                    onClick={(e) => handleSubmit(e, reviewId)}
-                    disabled={isSubmitting}
-                    style={{ background: isSubmitting ? '#93c5fd' : '#2563eb', color: 'white', border: 'none', padding: '0 1rem', borderRadius: '4px', cursor: isSubmitting ? 'not-allowed' : 'pointer' }}
-                  >
-                    {isSubmitting ? '...' : 'Post'}
-                  </button>
-                </div>
-              )}
-
-              {replies.length > 0 && (
-                <div style={{ marginTop: '1.5rem', marginLeft: '1.5rem', paddingLeft: '1rem', borderLeft: '2px solid #e5e7eb' }}>
-                  {replies.map((reply) => {
-                    const repData = reply.attributes || reply;
-                    const repUser = repData.user?.data?.attributes || repData.user || {};
-                    return (
-                      <div key={reply.id} style={{ marginBottom: '1rem', background: '#f9fafb', padding: '0.8rem', borderRadius: '6px' }}>
-                        <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#111827', marginBottom:'4px' }}>
-                          {repUser.username || 'User'} 
-                          <span style={{ fontWeight: 'normal', color: '#6b7280', marginLeft: '8px', fontSize: '0.75rem' }}>
-                            {new Date(repData.createdAt).toLocaleDateString()}
-                          </span>
-                        </div>
-                        <p style={{ margin: '0', fontSize: '0.9rem', color: '#4b5563', lineHeight:'1.4' }}>{repData.content}</p>
-                      </div>
-                    );
-                  })}
-                </div>
               )}
             </div>
           );
