@@ -48,17 +48,18 @@ export default function ProductReviews({ itemId, itemType }) {
       query.append(`filters[${filterField}][documentId][$eq]`, itemId);
       query.append('sort', 'createdAt:desc');
       
-      // 2. POPULATE (FIXED SYNTAX)
-      // We use 'user' explicitly instead of '*' to prevent 400 Bad Request
+      // --- FINAL FIX FOR 400 ERROR ---
+      // We use the specific bracket notation: [relation][populate][sub-relation]=*
       query.append('populate[user]', '*');
       query.append('populate[media]', '*');
       query.append('populate[parent]', '*'); 
-      query.append('populate[replies][populate]', 'user'); // <--- THE FIX
+      // This tells Strapi: "Inside 'replies', populate the 'user' field with all its data"
+      query.append('populate[replies][populate][user]', '*'); 
       
       const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/reviews?${query.toString()}`);
       const allReviews = res.data.data;
       
-      // 3. CLIENT-SIDE FILTERING (Layout Fix)
+      // --- CLIENT-SIDE FILTERING (Layout Fix) ---
       // Remove replies from the top-level list so they only show up nested
       const topLevelReviews = allReviews.filter(r => {
         const rData = r.attributes || r;
@@ -110,6 +111,7 @@ export default function ProductReviews({ itemId, itemType }) {
       }
 
       // Payload Construction
+      // FIX: Removed 'authorName' so it works with your database
       const payloadData = {
           content: content,
           user: user.id,
@@ -118,7 +120,7 @@ export default function ProductReviews({ itemId, itemType }) {
 
       if (parentId) {
           payloadData.parent = parentId;
-          payloadData.rating = 5; // Dummy rating for replies
+          payloadData.rating = 5; // Dummy rating (5) to satisfy validation
       } else {
           payloadData.rating = rating;
       }
@@ -207,12 +209,13 @@ export default function ProductReviews({ itemId, itemType }) {
           // Nested Replies Logic
           let replies = rData.replies?.data || rData.replies || [];
           if (Array.isArray(replies)) {
+             // Filter out any invalid/null items and Sort
              replies = replies
               .filter(r => r) 
               .sort((a, b) => {
                 const dateA = new Date(a.attributes?.createdAt || a.createdAt);
                 const dateB = new Date(b.attributes?.createdAt || b.createdAt);
-                return dateA - dateB; 
+                return dateA - dateB; // Oldest first
              });
           }
 
