@@ -3,8 +3,13 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Script from 'next/script';
 import ProductReviews from '@/components/ProductReviews';
-import { useCart } from '@/context/CartContext'; // Import Cart Hook
+import { useCart } from '@/context/CartContext';
+import dynamic from 'next/dynamic'; // Required for Map
+
+// --- DYNAMIC IMPORT FOR MAP (Prevents Server-Side Errors) ---
+const MapPicker = dynamic(() => import('@/components/MapPicker'), { ssr: false });
 
 // --- SMART IMAGE HELPER ---
 const getImageUrl = (url) => {
@@ -17,7 +22,7 @@ const getImageUrl = (url) => {
 };
 
 export default function ItemDetails() {
-  const { addToCart } = useCart(); // Use Cart Hook
+  const { addToCart } = useCart(); 
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
@@ -32,9 +37,10 @@ export default function ItemDetails() {
   const [selectedVariants, setSelectedVariants] = useState({}); 
   const [activeImageIndex, setActiveImageIndex] = useState(0);
 
-  // --- NEW STATE FOR OPTIONS ---
-  const [deliveryType, setDeliveryType] = useState(''); // 'pickup', 'shipping', 'onsite', 'home_service'
-  const [customerInfo, setCustomerInfo] = useState({ name: '', address: '' });
+  // --- UPDATED STATE FOR OPTIONS & LOCATION ---
+  const [deliveryType, setDeliveryType] = useState(''); 
+  // Added lat/lng to customerInfo
+  const [customerInfo, setCustomerInfo] = useState({ name: '', address: '', lat: null, lng: null });
 
   useEffect(() => {
     const fetchData = async () => {
@@ -107,9 +113,8 @@ export default function ItemDetails() {
     }
   };
 
-  // --- NEW: ADD TO CART HANDLER ---
+  // --- ADD TO CART HANDLER (Updated Validation) ---
   const handleAddToCart = () => {
-    // 1. Validation
     const name = item?.name || item?.attributes?.name;
     const variantData = item?.variantData || item?.attributes?.variantData || [];
 
@@ -129,13 +134,19 @@ export default function ItemDetails() {
       alert("Please enter your name.");
       return;
     }
-    // Require address only if delivery or home service is selected
-    if ((deliveryType === 'shipping' || deliveryType === 'home_service') && !customerInfo.address) {
-      alert("Please enter your address for delivery.");
-      return;
+    
+    // VALIDATE LOCATION PIN if Delivery/Home Service
+    if ((deliveryType === 'shipping' || deliveryType === 'home_service')) {
+        if (!customerInfo.lat || !customerInfo.lng) {
+            alert("Please pin your location on the map.");
+            return;
+        }
+        if (!customerInfo.address) {
+            alert("Please provide address details (e.g. Unit number, Color of house).");
+            return;
+        }
     }
 
-    // 2. Prepare Data
     const data = item.attributes || item;
     const price = data.price;
     const media = data.media?.data || data.media || [];
@@ -147,7 +158,7 @@ export default function ItemDetails() {
         name: name,
         price: price,
         image: imageUrl,
-        seller: seller, // Important for split payments
+        seller: seller, 
         type: type,
         quantity: quantity
     };
@@ -157,7 +168,6 @@ export default function ItemDetails() {
         deliveryType: deliveryType
     };
 
-    // 3. Add to Context
     addToCart(cartPayload, options, customerInfo);
   };
 
@@ -167,6 +177,7 @@ export default function ItemDetails() {
   const data = item.attributes || item;
   const sellerRaw = data.seller?.data?.attributes || data.seller || {};
   const sellerName = sellerRaw.shopName || sellerRaw.username || "Unknown Seller";
+  const sellerClientKey = sellerRaw.midtransClientKey || sellerRaw.midtrans_client_key || "";
   const variants = data.variantData || [];
   const attributes = data.customAttributes || [];
   const maxStock = data.stock || 999;
@@ -203,7 +214,6 @@ export default function ItemDetails() {
       <main className="container" style={{ marginTop: '2rem' }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2rem', background: 'white', padding: '2rem', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
           
-          {/* LEFT: GALLERY SECTION */}
           <div style={{ flex: '1 1 400px' }}>
             <div style={{ width: '100%', height: '400px', background: 'white', borderRadius: '8px', border: '1px solid #eee', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginBottom: '1rem' }}>
               {activeMedia ? (
@@ -231,7 +241,6 @@ export default function ItemDetails() {
             )}
           </div>
 
-          {/* RIGHT: DETAILS */}
           <div style={{ flex: '1 1 400px' }}>
             <h1 style={{ marginTop: 0, color: '#111827' }}>{data.name}</h1>
             <p style={{ color: '#007185', fontSize: '0.9rem' }}>
@@ -328,7 +337,7 @@ export default function ItemDetails() {
                     </div>
                   </div>
 
-                  {/* --- CUSTOMER INFO FORM --- */}
+                  {/* --- CUSTOMER INFO FORM WITH MAP --- */}
                   {deliveryType && (
                     <div style={{ background:'#f9fafb', padding:'15px', borderRadius:'6px', marginBottom:'1.5rem', border:'1px solid #e5e7eb' }}>
                         <div style={{marginBottom:'10px'}}>
@@ -342,14 +351,21 @@ export default function ItemDetails() {
                             />
                         </div>
 
-                        {/* Show Address Field ONLY if Delivery or Home Service */}
+                        {/* MAP LOGIC */}
                         {(deliveryType === 'shipping' || deliveryType === 'home_service') && (
                             <div>
-                                <label style={{fontSize:'0.9rem', fontWeight:'bold'}}>Delivery Address</label>
+                                <label style={{fontSize:'0.9rem', fontWeight:'bold', display:'block', marginBottom:'5px'}}>
+                                    Pin Location ({deliveryType === 'shipping' ? 'Delivery Destination' : 'Service Location'})
+                                </label>
+                                
+                                {/* MAP COMPONENT */}
+                                <MapPicker onLocationSelect={(loc) => setCustomerInfo({ ...customerInfo, lat: loc.lat, lng: loc.lng })} />
+
+                                <label style={{fontSize:'0.9rem', fontWeight:'bold', display:'block', marginTop:'10px'}}>Detail Address (Unit/Floor/Note)</label>
                                 <textarea 
-                                    placeholder="Enter full address"
+                                    placeholder="e.g. White fence, Unit 4B"
                                     style={{width:'100%', padding:'8px', border:'1px solid #ccc', borderRadius:'4px', marginTop:'4px'}}
-                                    rows={3}
+                                    rows={2}
                                     value={customerInfo.address}
                                     onChange={(e) => setCustomerInfo({...customerInfo, address: e.target.value})}
                                 />
@@ -369,6 +385,14 @@ export default function ItemDetails() {
         <ProductReviews itemId={item.documentId || item.id} itemType={type} />
 
       </main>
+
+      {sellerClientKey && (
+        <Script 
+          src="https://app.sandbox.midtrans.com/snap/snap.js"
+          data-client-key={sellerClientKey}
+          strategy="lazyOnload" 
+        />
+      )}
     </div>
   );
 }
