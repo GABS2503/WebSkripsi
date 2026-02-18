@@ -48,28 +48,33 @@ export default function ProductReviews({ itemId, itemType }) {
       query.append(`filters[${filterField}][documentId][$eq]`, itemId);
       query.append('sort', 'createdAt:desc');
       
-      // --- FINAL FIX FOR 400 ERROR ---
-      // We use the specific bracket notation: [relation][populate][sub-relation]=*
+      // 2. POPULATE (Use object syntax to prevent 400 errors)
       query.append('populate[user]', '*');
       query.append('populate[media]', '*');
       query.append('populate[parent]', '*'); 
-      // This tells Strapi: "Inside 'replies', populate the 'user' field with all its data"
+      // Important: Populate the user inside the replies
       query.append('populate[replies][populate][user]', '*'); 
       
       const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/reviews?${query.toString()}`);
       const allReviews = res.data.data;
       
-      // --- CLIENT-SIDE FILTERING (Layout Fix) ---
-      // Remove replies from the top-level list so they only show up nested
+      console.log("DEBUG: All Loaded Reviews", allReviews);
+
+      // 3. AGGRESSIVE CLIENT-SIDE FILTERING
       const topLevelReviews = allReviews.filter(r => {
         const rData = r.attributes || r;
-        const parent = rData.parent?.data || rData.parent;
         
-        // If parent exists (is not null/undefined), it is a reply. Hide it.
-        if (parent && (parent.id || parent.documentId)) {
-            return false;
-        }
-        return true;
+        // Check for parent in every possible location
+        const parentObj = rData.parent;
+        const parentData = parentObj?.data || parentObj;
+        
+        // Does a parent exist?
+        // We check for ID, documentId, or just if the object is not null
+        const hasParent = parentData && (parentData.id || parentData.documentId);
+
+        // If it has a parent, it is a REPLY. 
+        // We return FALSE to hide it from the main list.
+        return !hasParent;
       });
 
       setReviews(topLevelReviews);
@@ -111,7 +116,6 @@ export default function ProductReviews({ itemId, itemType }) {
       }
 
       // Payload Construction
-      // FIX: Removed 'authorName' so it works with your database
       const payloadData = {
           content: content,
           user: user.id,
@@ -120,7 +124,7 @@ export default function ProductReviews({ itemId, itemType }) {
 
       if (parentId) {
           payloadData.parent = parentId;
-          payloadData.rating = 5; // Dummy rating (5) to satisfy validation
+          payloadData.rating = 5; // Dummy rating for replies
       } else {
           payloadData.rating = rating;
       }
@@ -209,7 +213,6 @@ export default function ProductReviews({ itemId, itemType }) {
           // Nested Replies Logic
           let replies = rData.replies?.data || rData.replies || [];
           if (Array.isArray(replies)) {
-             // Filter out any invalid/null items and Sort
              replies = replies
               .filter(r => r) 
               .sort((a, b) => {
