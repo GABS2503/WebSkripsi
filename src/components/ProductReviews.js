@@ -23,7 +23,6 @@ const getImageUrl = (mediaData) => {
   if (url.startsWith('http') || url.startsWith('//')) return url;
 
   // 4. Construct URL with Base URL
-  // Remove trailing slash from base and leading slash from url to avoid doubles
   const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:1337').replace(/\/$/, '');
   const cleanUrl = url.replace(/^\//, '');
   
@@ -39,6 +38,9 @@ export default function ProductReviews({ itemId, itemType }) {
   const [replyContent, setReplyContent] = useState({}); 
   const [activeReplyId, setActiveReplyId] = useState(null);
   const [user, setUser] = useState(null);
+  
+  // New State to prevent Double-Submits
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const u = localStorage.getItem('user');
@@ -68,10 +70,11 @@ export default function ProductReviews({ itemId, itemType }) {
       // Sort Newest First
       query.append('sort', 'createdAt:desc');
 
+      // Note: Removed 'filters[parent][$null]' to prevent 400 errors. 
+      // We filter in JS below.
       const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/reviews?${query.toString()}`);
       
       // --- CLIENT-SIDE FILTERING ---
-      // This guarantees replies are removed from the main list
       const allReviews = res.data.data;
       const topLevelReviews = allReviews.filter(r => {
         const rData = r.attributes || r;
@@ -96,9 +99,12 @@ export default function ProductReviews({ itemId, itemType }) {
   const handleSubmit = async (e, parentId = null) => {
     e.preventDefault();
     if (!user) { alert("Please login to review"); return; }
+    if (isSubmitting) return; // Stop double clicks
 
     const content = parentId ? replyContent[parentId] : newComment;
     if (!content?.trim()) return;
+
+    setIsSubmitting(true); // Lock the button
 
     try {
       const token = localStorage.getItem('token');
@@ -115,7 +121,7 @@ export default function ProductReviews({ itemId, itemType }) {
       }
 
       // 2. Prepare Payload Data
-      // FIX: REMOVED 'authorName' TO PREVENT 400 ERROR
+      // IMPORTANT: 'authorName' IS REMOVED.
       const payloadData = {
           content: content,
           user: user.id,
@@ -124,7 +130,7 @@ export default function ProductReviews({ itemId, itemType }) {
 
       if (parentId) {
           payloadData.parent = parentId;
-          payloadData.rating = 5; // Send Dummy Rating for replies
+          payloadData.rating = 5; // Dummy rating for replies
       } else {
           payloadData.rating = rating;
       }
@@ -149,13 +155,19 @@ export default function ProductReviews({ itemId, itemType }) {
         setRating(5);
       }
       
-      // 5. Reload with delay
+      // 5. Reload
       setTimeout(() => fetchReviews(), 500);
 
     } catch (err) {
-      console.error("Submit Error:", err.response?.data?.error || err.message);
-      const msg = err.response?.data?.error?.message || "Failed to submit review";
-      alert(`Error: ${msg}`);
+      console.error("Submit Error:", err);
+      // Show the exact error message from Strapi
+      const errorDetails = err.response?.data?.error?.details?.errors 
+        ? JSON.stringify(err.response.data.error.details.errors)
+        : err.response?.data?.error?.message;
+        
+      alert(`Submission Failed: ${errorDetails || "Unknown Error"}`);
+    } finally {
+      setIsSubmitting(false); // Unlock the button
     }
   };
 
@@ -187,7 +199,17 @@ export default function ProductReviews({ itemId, itemType }) {
             <input type="file" accept="image/*" onChange={handleImageChange} />
             {preview && <img src={preview} alt="Preview" style={{ height: '60px', marginTop: '10px', borderRadius: '4px' }} />}
           </div>
-          <button type="submit" className="btn-primary" style={{ background: '#2563eb', color: 'white', border: 'none', padding: '0.6rem 1.2rem', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}>Submit Review</button>
+          <button 
+            type="submit" 
+            disabled={isSubmitting}
+            className="btn-primary" 
+            style={{ 
+              background: isSubmitting ? '#93c5fd' : '#2563eb', 
+              color: 'white', border: 'none', padding: '0.6rem 1.2rem', borderRadius: '6px', fontWeight: 'bold', cursor: isSubmitting ? 'not-allowed' : 'pointer' 
+            }}
+          >
+            {isSubmitting ? 'Submitting...' : 'Submit Review'}
+          </button>
         </form>
       ) : (
         <div style={{ padding: '1rem', background: '#eff6ff', color: '#1e40af', borderRadius: '6px', marginBottom: '2rem' }}>Please <a href="/login" style={{ fontWeight: 'bold', textDecoration: 'underline' }}>log in</a> to write a review.</div>
@@ -267,9 +289,10 @@ export default function ProductReviews({ itemId, itemType }) {
                   />
                   <button 
                     onClick={(e) => handleSubmit(e, reviewId)}
-                    style={{ background: '#2563eb', color: 'white', border: 'none', padding: '0 1rem', borderRadius: '4px', cursor: 'pointer' }}
+                    disabled={isSubmitting}
+                    style={{ background: isSubmitting ? '#93c5fd' : '#2563eb', color: 'white', border: 'none', padding: '0 1rem', borderRadius: '4px', cursor: isSubmitting ? 'not-allowed' : 'pointer' }}
                   >
-                    Post
+                    {isSubmitting ? '...' : 'Post'}
                   </button>
                 </div>
               )}
