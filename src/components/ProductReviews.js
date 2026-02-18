@@ -62,7 +62,7 @@ export default function ProductReviews({ itemId, itemType }) {
       // Populate EVERYTHING deeply
       query.append('populate[user]', '*');
       query.append('populate[media]', '*');
-      query.append('populate[parent]', '*'); // Needed to filter out replies
+      query.append('populate[parent]', '*'); 
       query.append('populate[replies][populate][user]', '*'); 
       
       // Sort Newest First
@@ -111,27 +111,24 @@ export default function ProductReviews({ itemId, itemType }) {
         const uploadRes = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/upload`, formData, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        // Handle array response
         mediaId = uploadRes.data[0]?.id || uploadRes.data.id;
       }
 
       // 2. Prepare Payload Data
+      // FIX: REMOVED 'authorName' TO PREVENT 400 ERROR
       const payloadData = {
           content: content,
           user: user.id,
-          [itemType === 'product' ? 'product' : 'service']: itemId,
-          authorName: user.username 
+          [itemType === 'product' ? 'product' : 'service']: itemId
       };
 
-      // --- CRITICAL FIX FOR 400 ERROR ---
       if (parentId) {
           payloadData.parent = parentId;
-          payloadData.rating = 5; // Send 5 (Dummy) because '0' fails validation!
+          payloadData.rating = 5; // Send Dummy Rating for replies
       } else {
           payloadData.rating = rating;
       }
 
-      // Only add media if we actually have it
       if (mediaId) {
           payloadData.media = mediaId;
       }
@@ -152,11 +149,10 @@ export default function ProductReviews({ itemId, itemType }) {
         setRating(5);
       }
       
-      // 5. Reload with delay to allow DB update
+      // 5. Reload with delay
       setTimeout(() => fetchReviews(), 500);
 
     } catch (err) {
-      // Log the EXACT error message from Strapi to Console
       console.error("Submit Error:", err.response?.data?.error || err.message);
       const msg = err.response?.data?.error?.message || "Failed to submit review";
       alert(`Error: ${msg}`);
@@ -209,13 +205,13 @@ export default function ProductReviews({ itemId, itemType }) {
           const reviewId = review.documentId || review.id;
           const isActiveReply = activeReplyId === reviewId;
 
-          // Process Replies: Ensure they are an array and SORT them Oldest First
+          // Process Replies
           let replies = rData.replies?.data || rData.replies || [];
           if (Array.isArray(replies)) {
              replies = [...replies].sort((a, b) => {
                 const dateA = new Date(a.attributes?.createdAt || a.createdAt);
                 const dateB = new Date(b.attributes?.createdAt || b.createdAt);
-                return dateA - dateB; // Ascending Order
+                return dateA - dateB;
              });
           }
 
@@ -226,10 +222,10 @@ export default function ProductReviews({ itemId, itemType }) {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <div style={{ width: '35px', height: '35px', background: '#3b82f6', color: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
-                    {rUser.username?.[0]?.toUpperCase() || (rData.authorName ? rData.authorName[0].toUpperCase() : 'U')}
+                    {rUser.username?.[0]?.toUpperCase() || 'U'}
                   </div>
                   <div>
-                    <div style={{ fontWeight: 'bold' }}>{rUser.username || rData.authorName || 'Anonymous'}</div>
+                    <div style={{ fontWeight: 'bold' }}>{rUser.username || 'Anonymous'}</div>
                     <div style={{ color: '#fbbf24', fontSize: '0.9rem' }}>{renderStars(rData.rating || 0)}</div>
                   </div>
                 </div>
@@ -287,7 +283,7 @@ export default function ProductReviews({ itemId, itemType }) {
                     return (
                       <div key={reply.id} style={{ marginBottom: '1rem', background: '#f9fafb', padding: '0.8rem', borderRadius: '6px' }}>
                         <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#111827', marginBottom:'4px' }}>
-                          {repUser.username || repData.authorName || 'User'} 
+                          {repUser.username || 'User'} 
                           <span style={{ fontWeight: 'normal', color: '#6b7280', marginLeft: '8px', fontSize: '0.75rem' }}>
                             {new Date(repData.createdAt).toLocaleDateString()}
                           </span>
