@@ -2,30 +2,20 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 
-// --- BULLETPROOF IMAGE HELPER ---
+// --- IMAGE HELPER ---
 const getImageUrl = (mediaData) => {
   if (!mediaData) return null;
-
-  // 1. Unwrap common Strapi layers safely
   let data = mediaData;
-  if (data.data) data = data.data; // Unwrap { data: ... }
-  if (Array.isArray(data)) data = data[0]; // Unwrap [ ... ] array
+  if (data.data) data = data.data; 
+  if (Array.isArray(data)) data = data[0]; 
   if (!data) return null;
-
-  // 2. Try to find the URL
   const attributes = data.attributes || data;
   let url = attributes.url;
-  
   if (!url) return null;
-
-  // 3. Trim and Clean
   url = url.trim();
   if (url.startsWith('http') || url.startsWith('//')) return url;
-
-  // 4. Construct URL with Base URL
   const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:1337').replace(/\/$/, '');
   const cleanUrl = url.replace(/^\//, '');
-  
   return `${baseUrl}/${cleanUrl}`;
 };
 
@@ -38,7 +28,6 @@ export default function ProductReviews({ itemId, itemType }) {
   const [replyContent, setReplyContent] = useState({}); 
   const [activeReplyId, setActiveReplyId] = useState(null);
   const [user, setUser] = useState(null);
-  
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -47,39 +36,43 @@ export default function ProductReviews({ itemId, itemType }) {
   }, []);
 
   useEffect(() => {
-    fetchReviews();
+    if (itemId) fetchReviews();
   }, [itemId, itemType]);
 
   const fetchReviews = async () => {
     try {
-      if (!itemId) return;
+      console.log(`Fetching reviews for ${itemType} ID:`, itemId); // DEBUG LOG
 
       const filterField = itemType === 'product' ? 'product' : 'service';
-      
-      // --- FIX 1: SIMPLER POPULATE SYNTAX (Prevents 400 Error) ---
-      // We use array notation or dot notation which is safer for your Strapi version
       const query = new URLSearchParams();
+      
+      // Filter by Document ID
       query.append(`filters[${filterField}][documentId][$eq]`, itemId);
       query.append('sort', 'createdAt:desc');
       
-      // Populate fields using standard array format
+      // Populate deeply
       query.append('populate[0]', 'user');
       query.append('populate[1]', 'media');
       query.append('populate[2]', 'parent');
-      query.append('populate[3]', 'replies.user'); // Dot notation for nested populate
+      query.append('populate[3]', 'replies.user'); 
 
       const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/reviews?${query.toString()}`);
       
-      // --- FIX 2: CLIENT-SIDE FILTERING (Fixes "Replies at Top" bug) ---
-      // We explicitly remove any review that has a parent from the main list.
-      // They will still be shown nested under their parents because of 'replies.user' populate.
       const allReviews = res.data.data;
+      console.log("DEBUG: Raw Reviews from API:", allReviews); // DEBUG LOG
+
+      // --- IMPROVED FILTER ---
+      // Only hide review if it definitely HAS a parent (is a reply)
       const topLevelReviews = allReviews.filter(r => {
         const rData = r.attributes || r;
         const parent = rData.parent?.data || rData.parent;
-        return !parent; // Only show if it has NO parent
+        
+        // If parent exists AND has an ID, it's a reply. Hide it from main list.
+        const isReply = parent && (parent.id || parent.documentId);
+        return !isReply; 
       });
 
+      console.log("DEBUG: Visible Top Level Reviews:", topLevelReviews); // DEBUG LOG
       setReviews(topLevelReviews);
     } catch (err) {
       console.error("Error fetching reviews:", err);
@@ -108,7 +101,6 @@ export default function ProductReviews({ itemId, itemType }) {
       const token = localStorage.getItem('token');
       let mediaId = null;
 
-      // 1. Upload Image
       if (!parentId && media) {
         const formData = new FormData();
         formData.append('files', media);
@@ -118,8 +110,6 @@ export default function ProductReviews({ itemId, itemType }) {
         mediaId = uploadRes.data[0]?.id || uploadRes.data.id;
       }
 
-      // 2. Prepare Payload
-      // FIX 3: Removed 'authorName' to prevent Schema Error
       const payloadData = {
           content: content,
           user: user.id,
@@ -128,21 +118,17 @@ export default function ProductReviews({ itemId, itemType }) {
 
       if (parentId) {
           payloadData.parent = parentId;
-          payloadData.rating = 5; // Dummy rating for replies
+          payloadData.rating = 5; 
       } else {
           payloadData.rating = rating;
       }
 
-      if (mediaId) {
-          payloadData.media = mediaId;
-      }
+      if (mediaId) payloadData.media = mediaId;
 
-      // 3. Send
       await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/reviews`, { data: payloadData }, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      // 4. Reset
       if (parentId) {
         setReplyContent({ ...replyContent, [parentId]: '' });
         setActiveReplyId(null);
@@ -153,7 +139,6 @@ export default function ProductReviews({ itemId, itemType }) {
         setRating(5);
       }
       
-      // 5. Reload
       setTimeout(() => fetchReviews(), 500);
 
     } catch (err) {
@@ -206,7 +191,7 @@ export default function ProductReviews({ itemId, itemType }) {
         <div style={{ padding: '1rem', background: '#eff6ff', color: '#1e40af', borderRadius: '6px', marginBottom: '2rem' }}>Please <a href="/login" style={{ fontWeight: 'bold', textDecoration: 'underline' }}>log in</a> to write a review.</div>
       )}
 
-      {/* --- LIST --- */}
+      {/* --- REVIEWS LIST --- */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         {reviews.length === 0 && <p style={{ color: '#6b7280' }}>No reviews yet. Be the first!</p>}
         
@@ -218,6 +203,7 @@ export default function ProductReviews({ itemId, itemType }) {
           const reviewId = review.documentId || review.id;
           const isActiveReply = activeReplyId === reviewId;
 
+          // SORT REPLIES: Oldest First
           let replies = rData.replies?.data || rData.replies || [];
           if (Array.isArray(replies)) {
              replies = [...replies].sort((a, b) => {
