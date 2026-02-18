@@ -18,7 +18,7 @@ const getImageUrl = (mediaData) => {
   
   if (!url) return null;
 
-  // 3. Trim whitespace and check for absolute URL
+  // 3. Trim and Clean
   url = url.trim();
   if (url.startsWith('http') || url.startsWith('//')) return url;
 
@@ -39,7 +39,6 @@ export default function ProductReviews({ itemId, itemType }) {
   const [activeReplyId, setActiveReplyId] = useState(null);
   const [user, setUser] = useState(null);
   
-  // New State to prevent Double-Submits
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -57,29 +56,28 @@ export default function ProductReviews({ itemId, itemType }) {
 
       const filterField = itemType === 'product' ? 'product' : 'service';
       
+      // --- FIX 1: SIMPLER POPULATE SYNTAX (Prevents 400 Error) ---
+      // We use array notation or dot notation which is safer for your Strapi version
       const query = new URLSearchParams();
-      // Match Item ID
       query.append(`filters[${filterField}][documentId][$eq]`, itemId);
-      
-      // Populate EVERYTHING deeply
-      query.append('populate[user]', '*');
-      query.append('populate[media]', '*');
-      query.append('populate[parent]', '*'); 
-      query.append('populate[replies][populate][user]', '*'); 
-      
-      // Sort Newest First
       query.append('sort', 'createdAt:desc');
+      
+      // Populate fields using standard array format
+      query.append('populate[0]', 'user');
+      query.append('populate[1]', 'media');
+      query.append('populate[2]', 'parent');
+      query.append('populate[3]', 'replies.user'); // Dot notation for nested populate
 
-      // Note: Removed 'filters[parent][$null]' to prevent 400 errors. 
-      // We filter in JS below.
       const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/reviews?${query.toString()}`);
       
-      // --- CLIENT-SIDE FILTERING ---
+      // --- FIX 2: CLIENT-SIDE FILTERING (Fixes "Replies at Top" bug) ---
+      // We explicitly remove any review that has a parent from the main list.
+      // They will still be shown nested under their parents because of 'replies.user' populate.
       const allReviews = res.data.data;
       const topLevelReviews = allReviews.filter(r => {
         const rData = r.attributes || r;
         const parent = rData.parent?.data || rData.parent;
-        return !parent; // Keep only if Parent is null/undefined
+        return !parent; // Only show if it has NO parent
       });
 
       setReviews(topLevelReviews);
@@ -99,18 +97,18 @@ export default function ProductReviews({ itemId, itemType }) {
   const handleSubmit = async (e, parentId = null) => {
     e.preventDefault();
     if (!user) { alert("Please login to review"); return; }
-    if (isSubmitting) return; // Stop double clicks
+    if (isSubmitting) return; 
 
     const content = parentId ? replyContent[parentId] : newComment;
     if (!content?.trim()) return;
 
-    setIsSubmitting(true); // Lock the button
+    setIsSubmitting(true);
 
     try {
       const token = localStorage.getItem('token');
       let mediaId = null;
 
-      // 1. Upload Image (only for main reviews)
+      // 1. Upload Image
       if (!parentId && media) {
         const formData = new FormData();
         formData.append('files', media);
@@ -120,8 +118,8 @@ export default function ProductReviews({ itemId, itemType }) {
         mediaId = uploadRes.data[0]?.id || uploadRes.data.id;
       }
 
-      // 2. Prepare Payload Data
-      // IMPORTANT: 'authorName' IS REMOVED.
+      // 2. Prepare Payload
+      // FIX 3: Removed 'authorName' to prevent Schema Error
       const payloadData = {
           content: content,
           user: user.id,
@@ -139,12 +137,12 @@ export default function ProductReviews({ itemId, itemType }) {
           payloadData.media = mediaId;
       }
 
-      // 3. Send Request
+      // 3. Send
       await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/reviews`, { data: payloadData }, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      // 4. Reset UI
+      // 4. Reset
       if (parentId) {
         setReplyContent({ ...replyContent, [parentId]: '' });
         setActiveReplyId(null);
@@ -160,14 +158,10 @@ export default function ProductReviews({ itemId, itemType }) {
 
     } catch (err) {
       console.error("Submit Error:", err);
-      // Show the exact error message from Strapi
-      const errorDetails = err.response?.data?.error?.details?.errors 
-        ? JSON.stringify(err.response.data.error.details.errors)
-        : err.response?.data?.error?.message;
-        
-      alert(`Submission Failed: ${errorDetails || "Unknown Error"}`);
+      const errorDetails = err.response?.data?.error?.message || "Unknown Error";
+      alert(`Submission Failed: ${errorDetails}`);
     } finally {
-      setIsSubmitting(false); // Unlock the button
+      setIsSubmitting(false);
     }
   };
 
@@ -180,7 +174,7 @@ export default function ProductReviews({ itemId, itemType }) {
     <div style={{ marginTop: '3rem', background: 'white', padding: '2rem', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
       <h3 style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>Customer Reviews</h3>
 
-      {/* --- WRITE REVIEW FORM --- */}
+      {/* --- FORM --- */}
       {user ? (
         <form onSubmit={(e) => handleSubmit(e)} style={{ marginBottom: '2rem', background: '#f9fafb', padding: '1.5rem', borderRadius: '8px' }}>
           <div style={{ marginBottom: '1rem' }}>
@@ -203,10 +197,7 @@ export default function ProductReviews({ itemId, itemType }) {
             type="submit" 
             disabled={isSubmitting}
             className="btn-primary" 
-            style={{ 
-              background: isSubmitting ? '#93c5fd' : '#2563eb', 
-              color: 'white', border: 'none', padding: '0.6rem 1.2rem', borderRadius: '6px', fontWeight: 'bold', cursor: isSubmitting ? 'not-allowed' : 'pointer' 
-            }}
+            style={{ background: isSubmitting ? '#93c5fd' : '#2563eb', color: 'white', border: 'none', padding: '0.6rem 1.2rem', borderRadius: '6px', fontWeight: 'bold', cursor: isSubmitting ? 'not-allowed' : 'pointer' }}
           >
             {isSubmitting ? 'Submitting...' : 'Submit Review'}
           </button>
@@ -215,7 +206,7 @@ export default function ProductReviews({ itemId, itemType }) {
         <div style={{ padding: '1rem', background: '#eff6ff', color: '#1e40af', borderRadius: '6px', marginBottom: '2rem' }}>Please <a href="/login" style={{ fontWeight: 'bold', textDecoration: 'underline' }}>log in</a> to write a review.</div>
       )}
 
-      {/* --- REVIEWS LIST --- */}
+      {/* --- LIST --- */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         {reviews.length === 0 && <p style={{ color: '#6b7280' }}>No reviews yet. Be the first!</p>}
         
@@ -227,7 +218,6 @@ export default function ProductReviews({ itemId, itemType }) {
           const reviewId = review.documentId || review.id;
           const isActiveReply = activeReplyId === reviewId;
 
-          // Process Replies
           let replies = rData.replies?.data || rData.replies || [];
           if (Array.isArray(replies)) {
              replies = [...replies].sort((a, b) => {
@@ -239,8 +229,6 @@ export default function ProductReviews({ itemId, itemType }) {
 
           return (
             <div key={reviewId} style={{ borderBottom: '1px solid #e5e7eb', paddingBottom: '1.5rem' }}>
-              
-              {/* Review Header */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <div style={{ width: '35px', height: '35px', background: '#3b82f6', color: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
@@ -265,10 +253,8 @@ export default function ProductReviews({ itemId, itemType }) {
                 </div>
               </div>
 
-              {/* Content */}
               <p style={{ color: '#374151', lineHeight: '1.5', margin: '0.5rem 0' }}>{rData.content}</p>
               
-              {/* Image */}
               {rMediaUrl && (
                 <img 
                   src={rMediaUrl} 
@@ -277,7 +263,6 @@ export default function ProductReviews({ itemId, itemType }) {
                 />
               )}
 
-              {/* Reply Form */}
               {isActiveReply && user && (
                 <div style={{ marginTop: '1rem', marginLeft: '1rem', display: 'flex', gap: '10px', background: '#f9fafb', padding: '10px', borderRadius: '6px' }}>
                   <input 
@@ -297,7 +282,6 @@ export default function ProductReviews({ itemId, itemType }) {
                 </div>
               )}
 
-              {/* NESTED REPLIES */}
               {replies.length > 0 && (
                 <div style={{ marginTop: '1.5rem', marginLeft: '1.5rem', paddingLeft: '1rem', borderLeft: '2px solid #e5e7eb' }}>
                   {replies.map((reply) => {
