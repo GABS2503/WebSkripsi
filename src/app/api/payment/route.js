@@ -2,12 +2,12 @@ import { NextResponse } from 'next/server';
 import Midtrans from 'midtrans-client';
 import axios from 'axios';
 
+// Ideally keep this in your .env.local file
 const STRAPI_API_TOKEN = "cb1b2d1a1ab9410f6da4a4d7b31592920434f4fbab398b4075610d808efe42e524e128822d68556909f808ab6d8a1cbfcaef7feb0926dcf15bb96171ca0416fca46231090980dad26b964be5d152520e242ffe5c8157871298463dfe52cd80278acfc5d9e5ad53266ac7316402d1aa575d0a35e4f773e3079810a579ce801104"; 
 
 export async function POST(request) {
   try {
     // 1. EXTRACT DATA
-    // We look for 'details' which might contain the list of items from the cart
     const { id, price, name, quantity, type, details } = await request.json();
 
     // 2. SETUP SERVER KEY
@@ -23,13 +23,14 @@ export async function POST(request) {
     const orderId = `ORDER-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     let parameter = {};
 
-    // --- LOGIC BRANCH: CART vs SINGLE ITEM ---
+    // --- CRITICAL FIX: BRANCHING LOGIC ---
 
     if (type === 'cart_checkout') {
-      // === OPTION A: CART CHECKOUT ===
-      // ⚠️ FIX: Do NOT fetch from Strapi because 'id' is fake (e.g. "CART-123")
-      
-      // If we have a list of items, map them. Otherwise create one summary item.
+      // === OPTION A: CART CHECKOUT (Skip Database Check) ===
+      console.log("Processing Cart Checkout...");
+
+      // Prepare item details for Midtrans
+      // If 'details' array exists, map it. Otherwise create a single summary item.
       const itemDetails = details ? details.map(item => ({
           id: item.id,
           price: parseInt(item.price),
@@ -45,7 +46,7 @@ export async function POST(request) {
       parameter = {
         transaction_details: {
           order_id: orderId,
-          gross_amount: parseInt(price), // Total calculated by frontend
+          gross_amount: parseInt(price), // Use the total calculated by frontend
         },
         item_details: itemDetails,
         enabled_payments: ["qris", "gopay", "shopeepay", "bank_transfer", "credit_card"],
@@ -53,7 +54,8 @@ export async function POST(request) {
       };
 
     } else {
-      // === OPTION B: SINGLE ITEM DIRECT BUY (Existing Logic) ===
+      // === OPTION B: SINGLE ITEM DIRECT BUY (Check Database) ===
+      console.log("Processing Single Item Checkout...");
       
       const apiUrl = process.env.NEXT_PUBLIC_API_URL;
       const endpoint = type === 'service' ? 'services' : 'products';
@@ -66,7 +68,7 @@ export async function POST(request) {
         filterQuery = `filters[id][$eq]=${id}`;
       }
 
-      // Fetch from Strapi
+      // Fetch from Strapi to verify price (Security)
       const strapiRes = await axios.get(`${apiUrl}/api/${endpoint}?${filterQuery}&populate=seller`, {
         headers: { Authorization: `Bearer ${STRAPI_API_TOKEN}` }
       });
@@ -74,7 +76,7 @@ export async function POST(request) {
       const itemData = strapiRes.data.data[0]; 
 
       if (!itemData) {
-        return NextResponse.json({ error: `${type} not found (404)` }, { status: 404 });
+        return NextResponse.json({ error: `${type} not found in database` }, { status: 404 });
       }
 
       // Calculate Math safely
