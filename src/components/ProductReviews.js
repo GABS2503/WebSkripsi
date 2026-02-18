@@ -2,15 +2,26 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 
-// --- SMART IMAGE HELPER ---
-const getImageUrl = (url) => {
-  if (!url) return null;
-  // If it's already a full URL (Cloudinary, AWS, or https), return it
-  if (url.startsWith('http') || url.startsWith('//')) return url;
+// --- BULLETPROOF IMAGE HELPER ---
+const getImageUrl = (mediaData) => {
+  if (!mediaData) return null;
+
+  // 1. Unwrap common Strapi layers safely
+  let data = mediaData;
+  if (data.data) data = data.data; // Unwrap { data: ... }
+  if (Array.isArray(data)) data = data[0]; // Unwrap [ ... ] array
+  if (!data) return null;
+
+  // 2. Try to find the URL in multiple places (v4 vs v5 structure)
+  const url = data.url || data.attributes?.url;
   
-  // Otherwise, clean it and prepend Backend URL
-  const cleanUrl = url.startsWith('/') ? url.substring(1) : url;
+  if (!url) return null;
+
+  // 3. Return full URL
+  if (url.startsWith('http') || url.startsWith('//')) return url;
   const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:1337';
+  // Remove leading slash to prevent double slashes
+  const cleanUrl = url.startsWith('/') ? url.substring(1) : url;
   return `${baseUrl}/${cleanUrl}`;
 };
 
@@ -29,7 +40,6 @@ export default function ProductReviews({ itemId, itemType }) {
     if (u) setUser(JSON.parse(u));
   }, []);
 
-  // Reload reviews whenever itemId changes
   useEffect(() => {
     fetchReviews();
   }, [itemId, itemType]);
@@ -40,27 +50,31 @@ export default function ProductReviews({ itemId, itemType }) {
 
       const filterField = itemType === 'product' ? 'product' : 'service';
       
-      // --- FIX 1: STRAPI DEEP POPULATE QUERY ---
-      // We need to explicitly tell Strapi to go deep into 'replies' -> 'user'
       const query = new URLSearchParams();
-      
-      // Filter: Match Item ID
+      // Match Item ID
       query.append(`filters[${filterField}][documentId][$eq]`, itemId);
-      // Filter: Only Top-Level Reviews (Parent is null)
-      query.append('filters[parent][$null]', 'true');
       
-      // Populate: Main Reviewer & Media
+      // Populate EVERYTHING deeply to ensure we get nested data
       query.append('populate[user]', '*');
       query.append('populate[media]', '*');
+      query.append('populate[parent]', '*'); // Important for client-side filtering
+      query.append('populate[replies][populate][user]', '*'); // Deep populate replies
       
-      // Populate: Nested Replies AND the User inside those replies
-      query.append('populate[replies][populate][user]', '*');
-      
-      // Sort
       query.append('sort', 'createdAt:desc');
 
       const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/reviews?${query.toString()}`);
-      setReviews(res.data.data);
+      
+      // --- FIX: CLIENT-SIDE FILTERING ---
+      // We manually filter out any review that HAS a parent. 
+      // This forces replies to vanish from the main list and only appear nested.
+      const allReviews = res.data.data;
+      const topLevelReviews = allReviews.filter(r => {
+        const rData = r.attributes || r;
+        const parent = rData.parent?.data || rData.parent;
+        return !parent; // Only keep if NO parent
+      });
+
+      setReviews(topLevelReviews);
     } catch (err) {
       console.error("Error fetching reviews:", err);
     }
@@ -85,14 +99,13 @@ export default function ProductReviews({ itemId, itemType }) {
       const token = localStorage.getItem('token');
       let mediaId = null;
 
-      // 1. Upload Image (only for main reviews)
+      // 1. Upload Image
       if (!parentId && media) {
         const formData = new FormData();
         formData.append('files', media);
         const uploadRes = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/upload`, formData, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        // Handle array response from upload
         mediaId = uploadRes.data[0]?.id || uploadRes.data.id;
       }
 
@@ -113,7 +126,7 @@ export default function ProductReviews({ itemId, itemType }) {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      // Reset Form
+      // 3. Reset UI
       if (parentId) {
         setReplyContent({ ...replyContent, [parentId]: '' });
         setActiveReplyId(null);
@@ -124,7 +137,11 @@ export default function ProductReviews({ itemId, itemType }) {
         setRating(5);
       }
       
-      fetchReviews();
+      // 4. Force Refetch with small delay to allow DB update
+      setTimeout(() => {
+          fetchReviews();
+      }, 500);
+
     } catch (err) {
       console.error(err);
       alert("Failed to submit review");
@@ -135,25 +152,11 @@ export default function ProductReviews({ itemId, itemType }) {
     return "★".repeat(count) + "☆".repeat(5 - count);
   };
 
-  // --- FIX 2: ROBUST IMAGE EXTRACTOR ---
-  const getReviewImageUrl = (mediaField) => {
-      if (!mediaField) return null;
-      
-      // Strapi v4/v5 madness: Handle array, object, data wrapper, or attributes wrapper
-      let data = mediaField;
-      if (data.data) data = data.data; // Unwrap { data: ... }
-      if (Array.isArray(data)) data = data[0]; // Unwrap [ ... ]
-      if (!data) return null;
-
-      const attrs = data.attributes || data; // Unwrap { attributes: ... }
-      return getImageUrl(attrs.url);
-  };
-
   return (
     <div style={{ marginTop: '3rem', background: 'white', padding: '2rem', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
       <h3 style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>Customer Reviews</h3>
 
-      {/* --- MAIN WRITE REVIEW FORM --- */}
+      {/* --- WRITE REVIEW FORM --- */}
       {user ? (
         <form onSubmit={(e) => handleSubmit(e)} style={{ marginBottom: '2rem', background: '#f9fafb', padding: '1.5rem', borderRadius: '8px' }}>
           <div style={{ marginBottom: '1rem' }}>
@@ -185,7 +188,8 @@ export default function ProductReviews({ itemId, itemType }) {
         {reviews.map((review) => {
           const rData = review.attributes || review;
           const rUser = rData.user?.data?.attributes || rData.user || {};
-          const rMediaUrl = getReviewImageUrl(rData.media);
+          // FIX: Use the bulletproof helper
+          const rMediaUrl = getImageUrl(rData.media);
           const replies = rData.replies?.data || rData.replies || [];
           const reviewId = review.documentId || review.id;
           const isActiveReply = activeReplyId === reviewId;
@@ -193,7 +197,7 @@ export default function ProductReviews({ itemId, itemType }) {
           return (
             <div key={reviewId} style={{ borderBottom: '1px solid #e5e7eb', paddingBottom: '1.5rem' }}>
               
-              {/* --- REVIEW HEADER --- */}
+              {/* Review Header */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <div style={{ width: '35px', height: '35px', background: '#3b82f6', color: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
@@ -205,7 +209,7 @@ export default function ProductReviews({ itemId, itemType }) {
                   </div>
                 </div>
                 
-                {/* Reply Button (Top Right) */}
+                {/* Reply Button */}
                 <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: '0.8rem', color: '#9ca3af' }}>{new Date(rData.createdAt).toLocaleDateString()}</div>
                     {user && (
@@ -219,9 +223,10 @@ export default function ProductReviews({ itemId, itemType }) {
                 </div>
               </div>
 
-              {/* --- CONTENT & IMAGE --- */}
+              {/* Content */}
               <p style={{ color: '#374151', lineHeight: '1.5', margin: '0.5rem 0' }}>{rData.content}</p>
               
+              {/* Image */}
               {rMediaUrl && (
                 <img 
                   src={rMediaUrl} 
@@ -230,7 +235,7 @@ export default function ProductReviews({ itemId, itemType }) {
                 />
               )}
 
-              {/* --- REPLY FORM (Conditionally Rendered) --- */}
+              {/* Reply Form */}
               {isActiveReply && user && (
                 <div style={{ marginTop: '1rem', marginLeft: '1rem', display: 'flex', gap: '10px', background: '#f9fafb', padding: '10px', borderRadius: '6px' }}>
                   <input 
@@ -249,7 +254,7 @@ export default function ProductReviews({ itemId, itemType }) {
                 </div>
               )}
 
-              {/* --- NESTED REPLIES (Bottom) --- */}
+              {/* NESTED REPLIES */}
               {replies.length > 0 && (
                 <div style={{ marginTop: '1.5rem', marginLeft: '1.5rem', paddingLeft: '1rem', borderLeft: '2px solid #e5e7eb' }}>
                   {replies.map((reply) => {
