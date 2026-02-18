@@ -9,11 +9,10 @@ export async function POST(request) {
     const body = await request.json();
     const { id, price, name, quantity, type, details } = body;
 
-    // --- DEBUGGING LOGS (Look at your Terminal!) ---
+    // --- DEBUGGING LOGS ---
     console.log("Payment Request Received!");
     console.log("Type:", type);
     console.log("ID:", id);
-    // -----------------------------------------------
 
     let serverKey = "Mid-server-3YJHL09y2ys1sTEuPuS0aLgm";
 
@@ -51,6 +50,42 @@ export async function POST(request) {
         enabled_payments: ["qris", "gopay", "shopeepay", "bank_transfer", "credit_card"],
         credit_card: { secure: true }
       };
+
+      // --- SAVE ORDER TO STRAPI (FOR SELLER ZONE) ---
+      // NOTE: Ensure you created an 'Order' collection in Strapi with:
+      // order_id, total_price, status, buyer_name, items (JSON), delivery_location (JSON), seller (Relation)
+      
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+      const sellerId = details[0]?.seller?.id || details[0]?.seller?.documentId;
+
+      if (sellerId) {
+          try {
+            await axios.post(`${apiUrl}/api/orders`, {
+                data: {
+                    order_id: orderId,
+                    total_price: parseInt(price),
+                    status: 'pending',
+                    buyer_name: details[0].customerInfo?.name || 'Guest',
+                    // Save the pinned location
+                    delivery_location: JSON.stringify({
+                        type: details[0].selectedOptions?.deliveryType,
+                        lat: details[0].customerInfo?.lat,
+                        lng: details[0].customerInfo?.lng,
+                        address_note: details[0].customerInfo?.address
+                    }),
+                    items: JSON.stringify(details.map(i => ({ name: i.name, qty: i.quantity, price: i.price }))),
+                    // Link to seller so they see it in their dashboard
+                    seller: sellerId 
+                }
+            }, {
+                headers: { Authorization: `Bearer ${STRAPI_API_TOKEN}` }
+            });
+            console.log("✅ Order saved to Strapi successfully");
+          } catch (dbError) {
+            console.error("❌ Failed to save order to Strapi:", dbError.response?.data || dbError.message);
+            // We continue anyway so payment doesn't fail, but check Strapi permissions/fields if this errors
+          }
+      }
 
     } 
     // === SINGLE ITEM LOGIC ===
