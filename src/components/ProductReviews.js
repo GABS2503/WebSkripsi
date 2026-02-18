@@ -41,44 +41,38 @@ export default function ProductReviews({ itemId, itemType }) {
 
   const fetchReviews = async () => {
     try {
+      console.log(`Fetching reviews for ${itemType} ID:`, itemId); // DEBUG LOG
+
       const filterField = itemType === 'product' ? 'product' : 'service';
       const query = new URLSearchParams();
       
-      // 1. Filter by Item ID
+      // Filter by Document ID
       query.append(`filters[${filterField}][documentId][$eq]`, itemId);
       query.append('sort', 'createdAt:desc');
       
-      // 2. POPULATE (Reverted to the syntax that gave you Status 200)
-      query.append('populate[user]', '*');
-      query.append('populate[media]', '*');
-      query.append('populate[parent]', '*'); 
-      // This specific syntax worked in your previous screenshot (d64545)
-      query.append('populate[replies][populate][user]', '*'); 
-      
-      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/reviews?${query.toString()}`);
-      const allReviews = res.data.data;
-      
-      console.log("DEBUG: All Loaded Reviews", allReviews);
+      // Populate deeply
+      query.append('populate[0]', 'user');
+      query.append('populate[1]', 'media');
+      query.append('populate[2]', 'parent');
+      query.append('populate[3]', 'replies.user'); 
 
-      // 3. AGGRESSIVE FILTERING
-      // We must check if 'parent' exists. If it does, it's a reply -> Hide it.
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/reviews?${query.toString()}`);
+      
+      const allReviews = res.data.data;
+      console.log("DEBUG: Raw Reviews from API:", allReviews); // DEBUG LOG
+
+      // --- IMPROVED FILTER ---
+      // Only hide review if it definitely HAS a parent (is a reply)
       const topLevelReviews = allReviews.filter(r => {
         const rData = r.attributes || r;
-        const parent = rData.parent;
-
-        // If parent is null or undefined, keep it (Main Review)
-        if (!parent) return true;
+        const parent = rData.parent?.data || rData.parent;
         
-        // Strapi v4: parent might be { data: null }
-        if (parent.data === null) return true;
-
-        // Strapi v5/v4: If parent has data (ID, Attributes, etc), it is a REPLY.
-        // So we return FALSE to remove it from this list.
-        if (parent.data || parent.id || parent.documentId) return false;
-
-        return true; 
+        // If parent exists AND has an ID, it's a reply. Hide it from main list.
+        const isReply = parent && (parent.id || parent.documentId);
+        return !isReply; 
       });
 
+      console.log("DEBUG: Visible Top Level Reviews:", topLevelReviews); // DEBUG LOG
       setReviews(topLevelReviews);
     } catch (err) {
       console.error("Error fetching reviews:", err);
@@ -209,22 +203,18 @@ export default function ProductReviews({ itemId, itemType }) {
           const reviewId = review.documentId || review.id;
           const isActiveReply = activeReplyId === reviewId;
 
-          // Nested Replies Logic
+          // SORT REPLIES: Oldest First
           let replies = rData.replies?.data || rData.replies || [];
           if (Array.isArray(replies)) {
-             replies = replies
-              .filter(r => r) 
-              .sort((a, b) => {
+             replies = [...replies].sort((a, b) => {
                 const dateA = new Date(a.attributes?.createdAt || a.createdAt);
                 const dateB = new Date(b.attributes?.createdAt || b.createdAt);
-                return dateA - dateB; // Oldest first
+                return dateA - dateB;
              });
           }
 
           return (
             <div key={reviewId} style={{ borderBottom: '1px solid #e5e7eb', paddingBottom: '1.5rem' }}>
-              
-              {/* Review Header */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <div style={{ width: '35px', height: '35px', background: '#3b82f6', color: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
@@ -259,7 +249,6 @@ export default function ProductReviews({ itemId, itemType }) {
                 />
               )}
 
-              {/* Reply Input Form */}
               {isActiveReply && user && (
                 <div style={{ marginTop: '1rem', marginLeft: '1rem', display: 'flex', gap: '10px', background: '#f9fafb', padding: '10px', borderRadius: '6px' }}>
                   <input 
@@ -279,7 +268,6 @@ export default function ProductReviews({ itemId, itemType }) {
                 </div>
               )}
 
-              {/* NESTED REPLIES SECTION */}
               {replies.length > 0 && (
                 <div style={{ marginTop: '1.5rem', marginLeft: '1.5rem', paddingLeft: '1rem', borderLeft: '2px solid #e5e7eb' }}>
                   {replies.map((reply) => {
