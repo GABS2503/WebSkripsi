@@ -48,26 +48,27 @@ export default function ProductReviews({ itemId, itemType }) {
       query.append(`filters[${filterField}][documentId][$eq]`, itemId);
       query.append('sort', 'createdAt:desc');
       
-      // 2. ROBUST POPULATE (Fixed)
-      // We use named keys to ensure 'parent' and 'replies' are definitely fetched
+      // --- FIX: SAFE POPULATE SYNTAX ---
+      // We use object notation which works on all Strapi versions
       query.append('populate[user]', '*');
       query.append('populate[media]', '*');
-      query.append('populate[parent]', '*'); // Critical: Needed to identify replies
-      query.append('populate[replies][populate][user]', '*'); // Critical: Needed to show nested replies
+      query.append('populate[parent]', '*'); // Essential for identifying replies!
+      
+      // This tells Strapi: "Populate EVERYTHING inside the replies relation"
+      // It is safer than "replies.user" which causes 400 errors in some versions
+      query.append('populate[replies][populate]', '*'); 
       
       const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/reviews?${query.toString()}`);
       const allReviews = res.data.data;
       
-      // 3. CLIENT-SIDE FILTERING
-      // If a review has a 'parent' object, it is a reply. Remove it from the main list.
+      // --- CLIENT-SIDE FILTERING ---
+      // If a review has a 'parent', it's a reply. Hide it from the top list.
       const topLevelReviews = allReviews.filter(r => {
         const rData = r.attributes || r;
         const parent = rData.parent?.data || rData.parent;
         
-        // Check if parent exists and is not empty
+        // If parent exists and has an ID, it is a reply -> Filter it OUT.
         const isReply = parent && (parent.id || parent.documentId);
-        
-        // Keep ONLY if it is NOT a reply
         return !isReply;
       });
 
@@ -117,7 +118,7 @@ export default function ProductReviews({ itemId, itemType }) {
 
       if (parentId) {
           payloadData.parent = parentId;
-          payloadData.rating = 5; 
+          payloadData.rating = 5; // Dummy rating for replies
       } else {
           payloadData.rating = rating;
       }
