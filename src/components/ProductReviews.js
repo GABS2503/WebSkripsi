@@ -12,7 +12,7 @@ const getImageUrl = (mediaData) => {
   if (Array.isArray(data)) data = data[0]; // Unwrap [ ... ] array
   if (!data) return null;
 
-  // 2. Try to find the URL (Handle v4 & v5)
+  // 2. Try to find the URL
   const attributes = data.attributes || data;
   let url = attributes.url;
   
@@ -70,7 +70,7 @@ export default function ProductReviews({ itemId, itemType }) {
 
       const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/reviews?${query.toString()}`);
       
-      // --- FIX: MANUAL CLIENT-SIDE FILTER ---
+      // --- CLIENT-SIDE FILTERING ---
       // This guarantees replies are removed from the main list
       const allReviews = res.data.data;
       const topLevelReviews = allReviews.filter(r => {
@@ -115,25 +115,33 @@ export default function ProductReviews({ itemId, itemType }) {
         mediaId = uploadRes.data[0]?.id || uploadRes.data.id;
       }
 
-      // 2. Create Review Payload
-      const payload = {
-        data: {
+      // 2. Prepare Payload Data
+      const payloadData = {
           content: content,
-          // FIX: Send 0 or 5 instead of null to prevent 400 Validation Error
-          rating: parentId ? 0 : rating, 
           user: user.id,
           [itemType === 'product' ? 'product' : 'service']: itemId,
-          parent: parentId,
-          media: mediaId,
           authorName: user.username 
-        }
       };
 
-      await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/reviews`, payload, {
+      // --- CRITICAL FIX FOR 400 ERROR ---
+      if (parentId) {
+          payloadData.parent = parentId;
+          payloadData.rating = 5; // Send 5 (Dummy) because '0' fails validation!
+      } else {
+          payloadData.rating = rating;
+      }
+
+      // Only add media if we actually have it
+      if (mediaId) {
+          payloadData.media = mediaId;
+      }
+
+      // 3. Send Request
+      await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/reviews`, { data: payloadData }, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      // 3. Reset UI
+      // 4. Reset UI
       if (parentId) {
         setReplyContent({ ...replyContent, [parentId]: '' });
         setActiveReplyId(null);
@@ -144,17 +152,18 @@ export default function ProductReviews({ itemId, itemType }) {
         setRating(5);
       }
       
-      // 4. Reload
+      // 5. Reload with delay to allow DB update
       setTimeout(() => fetchReviews(), 500);
 
     } catch (err) {
-      console.error("Submit Error:", err.response?.data || err.message);
-      alert("Failed to submit review. check console for details.");
+      // Log the EXACT error message from Strapi to Console
+      console.error("Submit Error:", err.response?.data?.error || err.message);
+      const msg = err.response?.data?.error?.message || "Failed to submit review";
+      alert(`Error: ${msg}`);
     }
   };
 
   const renderStars = (count) => {
-    // Safety check for negative/null ratings
     const safeCount = Math.max(0, Math.min(5, count || 0));
     return "★".repeat(safeCount) + "☆".repeat(5 - safeCount);
   };
@@ -195,7 +204,6 @@ export default function ProductReviews({ itemId, itemType }) {
         {reviews.map((review) => {
           const rData = review.attributes || review;
           const rUser = rData.user?.data?.attributes || rData.user || {};
-          // Use Fixed Image Helper
           const rMediaUrl = getImageUrl(rData.media);
           
           const reviewId = review.documentId || review.id;
