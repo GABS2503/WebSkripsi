@@ -9,7 +9,7 @@ export async function POST(request) {
     const body = await request.json();
     const { id, price, name, quantity, type, details } = body;
 
-    // --- DEBUGGING LOGS ---
+    // --- DEBUG LOGS ---
     console.log("Payment Request Received!");
     console.log("Type:", type);
     console.log("ID:", id);
@@ -28,7 +28,6 @@ export async function POST(request) {
     if (type === 'cart_checkout') {
       console.log("✅ PROCESSING AS CART CHECKOUT (Skipping DB Check)");
 
-      // Prepare items for Midtrans
       const itemDetails = details ? details.map(item => ({
           id: String(item.id).substring(0, 50),
           price: parseInt(item.price),
@@ -51,10 +50,7 @@ export async function POST(request) {
         credit_card: { secure: true }
       };
 
-      // --- SAVE ORDER TO STRAPI (FOR SELLER ZONE) ---
-      // NOTE: Ensure you created an 'Order' collection in Strapi with:
-      // order_id, total_price, status, buyer_name, items (JSON), delivery_location (JSON), seller (Relation)
-      
+      // --- SAVE ORDER TO STRAPI ---
       const apiUrl = process.env.NEXT_PUBLIC_API_URL;
       const sellerId = details[0]?.seller?.id || details[0]?.seller?.documentId;
 
@@ -64,9 +60,8 @@ export async function POST(request) {
                 data: {
                     order_id: orderId,
                     total_price: parseInt(price),
-                    status: 'pending',
+                    order_status: 'pending', // <--- CHANGED FROM 'status' TO 'order_status'
                     buyer_name: details[0].customerInfo?.name || 'Guest',
-                    // Save the pinned location
                     delivery_location: JSON.stringify({
                         type: details[0].selectedOptions?.deliveryType,
                         lat: details[0].customerInfo?.lat,
@@ -74,7 +69,6 @@ export async function POST(request) {
                         address_note: details[0].customerInfo?.address
                     }),
                     items: JSON.stringify(details.map(i => ({ name: i.name, qty: i.quantity, price: i.price }))),
-                    // Link to seller so they see it in their dashboard
                     seller: sellerId 
                 }
             }, {
@@ -83,7 +77,6 @@ export async function POST(request) {
             console.log("✅ Order saved to Strapi successfully");
           } catch (dbError) {
             console.error("❌ Failed to save order to Strapi:", dbError.response?.data || dbError.message);
-            // We continue anyway so payment doesn't fail, but check Strapi permissions/fields if this errors
           }
       }
 
@@ -102,7 +95,6 @@ export async function POST(request) {
         filterQuery = `filters[id][$eq]=${id}`;
       }
 
-      // Query Strapi
       const strapiRes = await axios.get(`${apiUrl}/api/${endpoint}?${filterQuery}&populate=seller`, {
         headers: { Authorization: `Bearer ${STRAPI_API_TOKEN}` }
       });
