@@ -42,17 +42,18 @@ export default function CartPage() {
     const orderName = `Order from ${groupData.sellerName} (${items.length} items)`;
 
     try {
-      // --- HERE IS THE FIX: Ensure type is EXACTLY 'cart_checkout' ---
+      // Create transaction token
       const res = await axios.post('/api/payment', { 
         id: `CART-${Date.now()}`, 
         price: totalAmount, 
         name: orderName,
-        type: 'cart_checkout', // <--- THIS IS CRITICAL
-        details: items // Send the items so backend can list them
+        type: 'cart_checkout',
+        details: items
       });
 
       const token = res.data.token;
 
+      // Trigger Snap Popup
       setTimeout(() => {
         // @ts-ignore
         if (window.snap) {
@@ -69,7 +70,6 @@ export default function CartPage() {
 
     } catch (err) {
       console.error(err);
-      // Alert the exact error from backend
       alert(err.response?.data?.error || "Payment initiation failed.");
     }
   };
@@ -79,12 +79,22 @@ export default function CartPage() {
   return (
     <div style={{ background: '#f3f4f6', minHeight: '100vh', padding: '2rem' }}>
       <div className="container" style={{maxWidth:'800px', margin:'0 auto'}}>
-        <h1 style={{marginBottom:'2rem'}}>Your Cart</h1>
+        
+        {/* --- BACK BUTTON ADDED HERE --- */}
+        <div style={{ marginBottom: '1.5rem' }}>
+            <Link href="/" style={{ textDecoration: 'none', color: '#374151', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '1.1rem' }}>
+                <span>&larr;</span> Continue Shopping
+            </Link>
+        </div>
+
+        <h1 style={{marginBottom:'2rem', fontSize:'2rem'}}>Your Cart</h1>
         
         {cart.length === 0 ? (
-          <div style={{textAlign:'center', padding:'3rem', background:'white', borderRadius:'8px'}}>
-            <h3>Your cart is empty.</h3>
-            <Link href="/" style={{color:'#2563eb', fontWeight:'bold'}}>Go Shopping &rarr;</Link>
+          <div style={{textAlign:'center', padding:'4rem', background:'white', borderRadius:'8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)'}}>
+            <h3 style={{color:'#6b7280', marginBottom:'1rem'}}>Your cart is empty.</h3>
+            <Link href="/" className="btn-primary" style={{ textDecoration:'none', display:'inline-block', padding:'10px 20px', borderRadius:'6px' }}>
+                Start Shopping
+            </Link>
           </div>
         ) : (
           <>
@@ -95,7 +105,7 @@ export default function CartPage() {
             {Object.entries(groupedItems).map(([sellerId, group]) => (
               <div key={sellerId} style={{ background: 'white', padding: '1.5rem', borderRadius: '8px', marginBottom: '2rem', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
                 <div style={{borderBottom:'1px solid #eee', paddingBottom:'10px', marginBottom:'1rem'}}>
-                  <h3 style={{margin:0}}>Store: {group.sellerName}</h3>
+                  <h3 style={{margin:0, color:'#111827'}}>Store: {group.sellerName}</h3>
                 </div>
 
                 {group.items.map((item) => (
@@ -109,6 +119,12 @@ export default function CartPage() {
                       <div style={{fontSize:'0.85rem', color:'#059669', background:'#ecfdf5', display:'inline-block', padding:'2px 8px', borderRadius:'4px'}}>
                           Option: <b>{item.selectedOptions?.deliveryType || "Standard"}</b>
                       </div>
+                      {/* Show customer name/address if available */}
+                      {item.customerInfo && (
+                          <div style={{fontSize:'0.85rem', color:'#555', marginTop:'4px'}}>
+                            For: {item.customerInfo.name}
+                          </div>
+                      )}
                     </div>
                     <div style={{textAlign:'right'}}>
                       <div style={{fontWeight:'bold', color:'#B12704'}}>Rp {(item.price * item.quantity).toLocaleString()}</div>
@@ -119,13 +135,13 @@ export default function CartPage() {
 
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:'1.5rem', paddingTop:'1rem', borderTop:'1px solid #eee' }}>
                   <div>
-                      <span>Subtotal:</span><br/>
+                      <span style={{color:'#666'}}>Subtotal:</span><br/>
                       <strong style={{fontSize:'1.2rem'}}>Rp {group.items.reduce((s, i)=>s+(i.price*i.quantity),0).toLocaleString()}</strong>
                   </div>
                   <button 
                       onClick={() => handlePaySeller(sellerId, group)}
                       className="btn-primary"
-                      style={{padding:'10px 20px', borderRadius:'6px'}}
+                      style={{padding:'12px 24px', borderRadius:'6px', fontSize:'1rem'}}
                   >
                       Checkout {group.items.length} Items
                   </button>
