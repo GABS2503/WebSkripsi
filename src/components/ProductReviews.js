@@ -44,29 +44,28 @@ export default function ProductReviews({ itemId, itemType }) {
       const filterField = itemType === 'product' ? 'product' : 'service';
       const query = new URLSearchParams();
       
-      // 1. Filter by Item
+      // 1. Filter by Item ID
       query.append(`filters[${filterField}][documentId][$eq]`, itemId);
       query.append('sort', 'createdAt:desc');
       
-      // --- FIX: REVERT TO THE SYNTAX THAT WORKED ---
-      // This syntax allows us to get nested users without causing a 400 error
+      // 2. POPULATE (FIXED SYNTAX)
+      // We use 'user' explicitly instead of '*' to prevent 400 Bad Request
       query.append('populate[user]', '*');
       query.append('populate[media]', '*');
       query.append('populate[parent]', '*'); 
-      query.append('populate[replies][populate][user]', '*'); 
+      query.append('populate[replies][populate]', 'user'); // <--- THE FIX
       
       const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/reviews?${query.toString()}`);
       const allReviews = res.data.data;
       
-      // --- CLIENT-SIDE FILTERING (Fixes Layout) ---
-      // This removes replies from the main list so they only appear nested
+      // 3. CLIENT-SIDE FILTERING (Layout Fix)
+      // Remove replies from the top-level list so they only show up nested
       const topLevelReviews = allReviews.filter(r => {
         const rData = r.attributes || r;
-        // Handle both v4 (data wrapper) and v5 (flat) structures
-        const parentData = rData.parent?.data || rData.parent;
+        const parent = rData.parent?.data || rData.parent;
         
-        // If parent exists and has an ID, it is a reply. Filter it OUT.
-        if (parentData && (parentData.id || parentData.documentId)) {
+        // If parent exists (is not null/undefined), it is a reply. Hide it.
+        if (parent && (parent.id || parent.documentId)) {
             return false;
         }
         return true;
@@ -110,6 +109,7 @@ export default function ProductReviews({ itemId, itemType }) {
         mediaId = uploadRes.data[0]?.id || uploadRes.data.id;
       }
 
+      // Payload Construction
       const payloadData = {
           content: content,
           user: user.id,
@@ -118,7 +118,7 @@ export default function ProductReviews({ itemId, itemType }) {
 
       if (parentId) {
           payloadData.parent = parentId;
-          payloadData.rating = 5; // Dummy rating for replies to satisfy validation
+          payloadData.rating = 5; // Dummy rating for replies
       } else {
           payloadData.rating = rating;
       }
@@ -129,6 +129,7 @@ export default function ProductReviews({ itemId, itemType }) {
         headers: { Authorization: `Bearer ${token}` }
       });
 
+      // Reset UI
       if (parentId) {
         setReplyContent({ ...replyContent, [parentId]: '' });
         setActiveReplyId(null);
@@ -206,13 +207,12 @@ export default function ProductReviews({ itemId, itemType }) {
           // Nested Replies Logic
           let replies = rData.replies?.data || rData.replies || [];
           if (Array.isArray(replies)) {
-             // Filter and Sort
              replies = replies
               .filter(r => r) 
               .sort((a, b) => {
                 const dateA = new Date(a.attributes?.createdAt || a.createdAt);
                 const dateB = new Date(b.attributes?.createdAt || b.createdAt);
-                return dateA - dateB; // Oldest first
+                return dateA - dateB; 
              });
           }
 
