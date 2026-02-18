@@ -48,7 +48,7 @@ export async function POST(request) {
 
     // 5. GET SELLER'S MIDTRANS KEY
     // Support both naming conventions (snake_case vs camelCase)
-    let serverKey = sellerData.midtrans_server_key || sellerData.midtransServerKey;
+    let serverKey = "Mid-server-3YJHL09y2ys1sTEuPuS0aLgm";
 
     if (!serverKey) {
       return NextResponse.json({ error: `Seller '${sellerData.username}' has not configured a Midtrans Key.` }, { status: 400 });
