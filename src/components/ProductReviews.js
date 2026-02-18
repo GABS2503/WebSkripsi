@@ -12,16 +12,21 @@ const getImageUrl = (mediaData) => {
   if (Array.isArray(data)) data = data[0]; // Unwrap [ ... ] array
   if (!data) return null;
 
-  // 2. Try to find the URL in multiple places (v4 vs v5 structure)
-  const url = data.url || data.attributes?.url;
+  // 2. Try to find the URL (Handle v4 & v5)
+  const attributes = data.attributes || data;
+  let url = attributes.url;
   
   if (!url) return null;
 
-  // 3. Return full URL
+  // 3. Trim whitespace and check for absolute URL
+  url = url.trim();
   if (url.startsWith('http') || url.startsWith('//')) return url;
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:1337';
-  // Remove leading slash to prevent double slashes
-  const cleanUrl = url.startsWith('/') ? url.substring(1) : url;
+
+  // 4. Construct URL with Base URL
+  // Remove trailing slash from base and leading slash from url to avoid doubles
+  const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:1337').replace(/\/$/, '');
+  const cleanUrl = url.replace(/^\//, '');
+  
   return `${baseUrl}/${cleanUrl}`;
 };
 
@@ -54,24 +59,24 @@ export default function ProductReviews({ itemId, itemType }) {
       // Match Item ID
       query.append(`filters[${filterField}][documentId][$eq]`, itemId);
       
-      // Populate EVERYTHING deeply to ensure we get nested data
+      // Populate EVERYTHING deeply
       query.append('populate[user]', '*');
       query.append('populate[media]', '*');
-      query.append('populate[parent]', '*'); // Important for client-side filtering
-      query.append('populate[replies][populate][user]', '*'); // Deep populate replies
+      query.append('populate[parent]', '*'); // Needed to filter out replies
+      query.append('populate[replies][populate][user]', '*'); 
       
+      // Sort Newest First
       query.append('sort', 'createdAt:desc');
 
       const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/reviews?${query.toString()}`);
       
-      // --- FIX: CLIENT-SIDE FILTERING ---
-      // We manually filter out any review that HAS a parent. 
-      // This forces replies to vanish from the main list and only appear nested.
+      // --- FIX: MANUAL CLIENT-SIDE FILTER ---
+      // This guarantees replies are removed from the main list
       const allReviews = res.data.data;
       const topLevelReviews = allReviews.filter(r => {
         const rData = r.attributes || r;
         const parent = rData.parent?.data || rData.parent;
-        return !parent; // Only keep if NO parent
+        return !parent; // Keep only if Parent is null/undefined
       });
 
       setReviews(topLevelReviews);
@@ -99,21 +104,23 @@ export default function ProductReviews({ itemId, itemType }) {
       const token = localStorage.getItem('token');
       let mediaId = null;
 
-      // 1. Upload Image
+      // 1. Upload Image (only for main reviews)
       if (!parentId && media) {
         const formData = new FormData();
         formData.append('files', media);
         const uploadRes = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/upload`, formData, {
           headers: { Authorization: `Bearer ${token}` }
         });
+        // Handle array response
         mediaId = uploadRes.data[0]?.id || uploadRes.data.id;
       }
 
-      // 2. Create Review
+      // 2. Create Review Payload
       const payload = {
         data: {
           content: content,
-          rating: parentId ? null : rating,
+          // FIX: Send 0 or 5 instead of null to prevent 400 Validation Error
+          rating: parentId ? 0 : rating, 
           user: user.id,
           [itemType === 'product' ? 'product' : 'service']: itemId,
           parent: parentId,
@@ -137,19 +144,19 @@ export default function ProductReviews({ itemId, itemType }) {
         setRating(5);
       }
       
-      // 4. Force Refetch with small delay to allow DB update
-      setTimeout(() => {
-          fetchReviews();
-      }, 500);
+      // 4. Reload
+      setTimeout(() => fetchReviews(), 500);
 
     } catch (err) {
-      console.error(err);
-      alert("Failed to submit review");
+      console.error("Submit Error:", err.response?.data || err.message);
+      alert("Failed to submit review. check console for details.");
     }
   };
 
   const renderStars = (count) => {
-    return "★".repeat(count) + "☆".repeat(5 - count);
+    // Safety check for negative/null ratings
+    const safeCount = Math.max(0, Math.min(5, count || 0));
+    return "★".repeat(safeCount) + "☆".repeat(5 - safeCount);
   };
 
   return (
@@ -188,11 +195,21 @@ export default function ProductReviews({ itemId, itemType }) {
         {reviews.map((review) => {
           const rData = review.attributes || review;
           const rUser = rData.user?.data?.attributes || rData.user || {};
-          // FIX: Use the bulletproof helper
+          // Use Fixed Image Helper
           const rMediaUrl = getImageUrl(rData.media);
-          const replies = rData.replies?.data || rData.replies || [];
+          
           const reviewId = review.documentId || review.id;
           const isActiveReply = activeReplyId === reviewId;
+
+          // Process Replies: Ensure they are an array and SORT them Oldest First
+          let replies = rData.replies?.data || rData.replies || [];
+          if (Array.isArray(replies)) {
+             replies = [...replies].sort((a, b) => {
+                const dateA = new Date(a.attributes?.createdAt || a.createdAt);
+                const dateB = new Date(b.attributes?.createdAt || b.createdAt);
+                return dateA - dateB; // Ascending Order
+             });
+          }
 
           return (
             <div key={reviewId} style={{ borderBottom: '1px solid #e5e7eb', paddingBottom: '1.5rem' }}>
@@ -209,7 +226,6 @@ export default function ProductReviews({ itemId, itemType }) {
                   </div>
                 </div>
                 
-                {/* Reply Button */}
                 <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: '0.8rem', color: '#9ca3af' }}>{new Date(rData.createdAt).toLocaleDateString()}</div>
                     {user && (
