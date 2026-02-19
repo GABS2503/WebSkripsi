@@ -2,16 +2,16 @@
 
 :root {
   /* Ultra-modern monochrome palette with a vibrant accent */
-  --bg-page: #fcfcfd;            /* Almost white, very clean */
-  --bg-element: #ffffff;         /* Pure white for cards */
-  --bg-muted: #f4f4f5;           /* Soft gray for inputs/tabs */
+  --bg-page: #fcfcfd;            
+  --bg-element: #ffffff;         
+  --bg-muted: #f4f4f5;           
   
-  --text-main: #09090b;          /* Pitch black for ultimate contrast */
-  --text-secondary: #71717a;     /* Soft slate for descriptions */
+  --text-main: #09090b;          
+  --text-secondary: #71717a;     
   
-  --accent-color: #6366f1;       /* Vibrant Indigo for focus states */
-  --action-primary: #09090b;     /* Black buttons */
-  --action-hover: #27272a;       /* Slightly lighter black on hover */
+  --accent-color: #6366f1;       
+  --action-primary: #09090b;     
+  --action-hover: #27272a;       
   
   --danger-color: #ef4444;
   --success-color: #10b981;
@@ -36,18 +36,24 @@ body {
 }
 
 /* =========================================
-   1. THE FLOATING NAVBAR (Completely New Look)
+   1. THE EXPANSIVE NAVBAR
    ========================================= */
 .navbar {
-  background-color: rgba(255, 255, 255, 0.8);
+  background-color: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  max-width: 1200px;
-  margin: 1.5rem auto; /* Floats away from the edges */
-  padding: 0.75rem 1.5rem;
+  
+  /* CHANGED: Expanded width to use empty screen space */
+  max-width: 1800px; 
+  width: 96%;
+  margin: 1.5rem auto; 
+  padding: 0.75rem 2rem;
+  
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 2rem; /* Added breathing room between elements */
+  
   border-radius: var(--radius-pill);
   box-shadow: var(--shadow-glass);
   border: 1px solid rgba(0, 0, 0, 0.04);
@@ -57,45 +63,99 @@ body {
 }
 
 .navbar h1, .nav-logo {
-  font-size: 1.25rem;
+  font-size: 1.5rem;
   font-weight: 800;
   color: var(--text-main);
   margin: 0;
   letter-spacing: -0.5px;
+  text-decoration: none;
+  flex-shrink: 0; /* Prevents logo from squishing */
 }
 
-/* Navbar Links (now dark text) */
-.navbar a {
-  color: var(--text-secondary) !important;
-  font-weight: 600 !important;
+/* CHANGED: Let the search bar dynamically fill empty center space */
+.nav-search-container {
+  flex-grow: 1;
+  max-width: 800px; /* Prevents it from getting absurdly wide on 4K screens */
+  display: flex;
+  background: var(--bg-muted);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  border: 2px solid transparent;
+  transition: all 0.2s;
+}
+
+.nav-search-container:focus-within {
+  border-color: var(--accent-color);
+  background: var(--bg-element);
+  box-shadow: 0 4px 15px rgba(99, 102, 241, 0.1);
+}
+
+.nav-search-input {
+  width: 100%;
+  padding: 0.8rem 1.5rem;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 1rem;
+}
+
+.nav-search-btn {
+  background: transparent;
+  border: none;
+  padding: 0 1.5rem;
+  cursor: pointer;
+  font-size: 1.2rem;
+  transition: transform 0.2s;
+}
+
+.nav-search-btn:hover {
+  transform: scale(1.1);
+}
+
+/* CHANGED: Fixed Nav Links so text doesn't mash together */
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  flex-shrink: 0;
+}
+
+.nav-item {
+  display: flex;
+  flex-direction: column; /* Stacks "Hello Name" over "Your Account" */
+  text-decoration: none;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
   transition: color 0.2s;
+  cursor: pointer;
 }
 
-.navbar a:hover {
-  color: var(--text-main) !important;
+.nav-item span:last-child {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text-main);
 }
 
-/* Special styling for buttons inside navbar */
-.navbar a[style*="background"] {
-  background: var(--bg-muted) !important;
-  color: var(--text-main) !important;
-  border-radius: var(--radius-pill) !important;
-  padding: 0.6rem 1.2rem !important;
+.nav-item:hover, .nav-item:hover span {
+  color: var(--accent-color);
 }
 
 /* =========================================
-   2. GRID & LAYOUT
+   2. EXPANDED GRID & LAYOUT
    ========================================= */
 .container {
-  max-width: 1200px; /* Tighter, more curated width */
+  /* CHANGED: Expanded to use all screen space */
+  max-width: 1800px; 
+  width: 96%;
   margin: 0 auto;
-  padding: 2rem 1rem;
+  padding: 2rem 0;
 }
 
 .grid-4 {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 2.5rem; /* More breathing room between cards */
+  /* CHANGED: Cards will now automatically fill the screen width */
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 2.5rem; 
 }
 
 /* =========================================
@@ -104,22 +164,22 @@ body {
 .card {
   background: var(--bg-element);
   border-radius: var(--radius-md);
-  padding: 1rem;
+  padding: 1.25rem;
   display: flex;
   flex-direction: column;
   box-shadow: var(--shadow-float);
   border: none;
   transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s ease;
-  will-change: transform;
+  height: 100%; /* Ensures all cards in a row are same height */
 }
 
 .card:hover {
-  transform: translateY(-8px) scale(1.02); /* Floats up and slightly enlarges */
+  transform: translateY(-8px) scale(1.02);
   box-shadow: var(--shadow-hover);
 }
 
 .card-image {
-  height: 240px;
+  height: 260px;
   width: 100%;
   background: var(--bg-muted);
   border-radius: 16px;
@@ -133,7 +193,7 @@ body {
 .card-image img {
   width: 100%;
   height: 100%;
-  object-fit: cover; /* Edge-to-edge images look much more modern */
+  object-fit: cover; 
   transition: transform 0.6s ease;
 }
 
@@ -141,19 +201,37 @@ body {
   transform: scale(1.05);
 }
 
-.card h3 {
-  font-size: 1.1rem;
-  font-weight: 700;
-  margin: 0 0 0.25rem 0;
-  color: var(--text-main);
-  letter-spacing: -0.3px;
+.card-body {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1; /* Pushes the button to the bottom */
 }
 
-.price-tag, .card div[style*="color: #B12704"] {
-  font-size: 1.2rem !important;
+.card h3 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin: 0 0 0.5rem 0;
+  color: var(--text-main);
+  letter-spacing: -0.3px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.price-tag {
+  font-size: 1.35rem !important;
   font-weight: 800 !important;
-  color: var(--text-main) !important; /* Replaced the red with bold black */
-  margin-bottom: 1.5rem !important;
+  color: var(--text-main) !important; 
+  margin-bottom: 1rem !important;
+  margin-top: 0.5rem;
+}
+
+.seller-badge {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  margin-bottom: auto; /* Pushes everything below it to the bottom */
+  padding-bottom: 1.5rem;
 }
 
 /* =========================================
@@ -197,12 +275,12 @@ body {
 }
 
 /* =========================================
-   5. SELLER DASHBOARD & FORMS (iOS Style)
+   5. SELLER DASHBOARD & FORMS
    ========================================= */
 .form-container {
-  max-width: 700px;
+  max-width: 800px;
   margin: 0 auto;
-  background: transparent; /* Removed the heavy white box */
+  background: transparent;
   box-shadow: none;
   padding: 0;
 }
@@ -213,7 +291,7 @@ body {
   letter-spacing: -1px;
 }
 
-/* Segmented Control Tabs (Like iPhone settings) */
+/* Segmented Control Tabs */
 .tab-group {
   display: flex;
   background: #e4e4e7;
@@ -321,7 +399,7 @@ textarea.input-field {
   margin-bottom: 1.5rem;
 }
 
-/* Red "Remove" buttons - Make them look like destructive badges */
+/* Red "Remove" buttons */
 button[style*="color:red"], button[style*="color: red"], button[style*="color:#b91c1c"] {
   border: none !important;
   color: var(--danger-color) !important;
@@ -342,10 +420,15 @@ button[style*="color:red"]:hover, button[style*="color: red"]:hover, button[styl
 @media (max-width: 768px) {
   .navbar {
     margin: 0;
+    width: 100%;
     border-radius: 0;
     flex-direction: column;
     padding: 1rem;
     gap: 1rem;
+  }
+  .nav-search-container {
+    width: 100%;
+    max-width: 100%;
   }
   .flex-row {
     flex-direction: column;
