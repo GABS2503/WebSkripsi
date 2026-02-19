@@ -7,6 +7,21 @@ import Link from 'next/link';
 // Dynamically import map to view location
 const MapViewer = dynamic(() => import('@/components/MapViewer'), { ssr: false });
 
+// --- CRITICAL FIX: Safe JSON Parser ---
+const safeParseJSON = (data, fallback) => {
+  if (!data) return fallback;
+  // If Strapi already converted it to an object/array, return it directly!
+  if (typeof data === 'object') return data; 
+  
+  // If it's still a string, try to parse it
+  try {
+    return JSON.parse(data);
+  } catch (e) {
+    console.error("Failed to parse JSON:", data);
+    return fallback;
+  }
+};
+
 export default function SellerOrders() {
   const [orders, setOrders] = useState([]);
   const [user, setUser] = useState(null);
@@ -25,14 +40,11 @@ export default function SellerOrders() {
 
   const fetchOrders = async (userId) => {
     try {
-        // 1. GET THE TOKEN
         const token = localStorage.getItem('token'); 
-        
-        // 2. SEND TOKEN WITH THE REQUEST
         const res = await axios.get(
             `${process.env.NEXT_PUBLIC_API_URL}/api/orders?filters[seller][id][$eq]=${userId}&sort=createdAt:desc&populate=*`, 
             {
-                headers: { Authorization: `Bearer ${token}` } // <--- CRITICAL FIX
+                headers: { Authorization: `Bearer ${token}` } 
             }
         );
         
@@ -60,8 +72,10 @@ export default function SellerOrders() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
         {orders.map((order) => {
             const data = order.attributes || order;
-            const location = data.delivery_location ? JSON.parse(data.delivery_location) : null;
-            const items = data.items ? JSON.parse(data.items) : [];
+            
+            // --- USE SAFE PARSER HERE ---
+            const location = safeParseJSON(data.delivery_location, null);
+            const items = safeParseJSON(data.items, []);
 
             return (
                 <div key={order.id} style={{ background: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>
@@ -76,7 +90,7 @@ export default function SellerOrders() {
                         <strong>Buyer Name:</strong> {data.buyer_name}<br/>
                         <strong>Items Purchased:</strong>
                         <ul style={{marginTop:'5px', color:'#374151', background:'#f9fafb', padding:'10px 10px 10px 30px', borderRadius:'6px'}}>
-                            {items.map((i, idx) => (
+                            {Array.isArray(items) && items.map((i, idx) => (
                                 <li key={idx} style={{marginBottom:'5px'}}>
                                     <b>{i.qty}x</b> {i.name} — Rp {i.price?.toLocaleString()}
                                 </li>
@@ -102,6 +116,7 @@ export default function SellerOrders() {
                             <div style={{height:'250px', width:'100%', border:'2px solid #e5e7eb', borderRadius:'8px', overflow:'hidden'}}>
                                 <MapViewer lat={location.lat} lng={location.lng} />
                             </div>
+                            {/* Fixed Google Maps Link */}
                             <a 
                                 href={`https://www.google.com/maps?q=${location.lat},${location.lng}`} 
                                 target="_blank"
