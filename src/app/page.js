@@ -4,17 +4,17 @@ import axios from 'axios';
 import Script from 'next/script';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 
-// --- 1. SMART IMAGE HELPER (Prevents Double URLs) ---
+// --- DYNAMIC IMPORT FOR STORE MAP ---
+const StoreMap = dynamic(() => import('@/components/StoreMap'), { ssr: false });
+
+// --- SMART IMAGE HELPER ---
 const getImageUrl = (url) => {
   if (!url) return null;
-  
-  // If the URL is already a full link (Cloudinary, AWS, or already has http), use it as is
   if (url.startsWith('http') || url.startsWith('//')) {
     return url;
   }
-  
-  // Otherwise, prepend the Backend URL
   const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:1337';
   return `${baseUrl}${url}`;
 };
@@ -23,12 +23,18 @@ export default function Marketplace() {
   const router = useRouter();
   const [items, setItems] = useState([]);
   const [streams, setStreams] = useState([]);
+  const [sellersMapLocations, setSellersMapLocations] = useState([]); // Map locations state
   const [search, setSearch] = useState('');
   const [user, setUser] = useState(null);
 
-  // --- HELPER: Generate Star String (e.g. "★★★★☆") ---
+  // --- FILTERS & SORTING STATE ---
+  const [typeFilter, setTypeFilter] = useState('all'); 
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [sortPrice, setSortPrice] = useState('none'); 
+
+  // --- HELPER: Generate Star String ---
   const renderStars = (rating) => {
-    const rounded = Math.round(rating); // Round to nearest whole number
+    const rounded = Math.round(rating); 
     return "★".repeat(rounded) + "☆".repeat(5 - rounded);
   };
 
@@ -53,15 +59,10 @@ export default function Marketplace() {
       const shopName = sellerData?.shopName || sellerData?.username || "Unknown Shop";
       
       const firstMedia = getFirstMedia(data.media);
-      
-      // --- FIX APPLIED HERE: Use getImageUrl immediately ---
-      // This ensures item.mediaUrl is ALWAYS a full, valid link
       const mediaUrl = getImageUrl(firstMedia?.url);
       const mimeType = firstMedia?.mime || '';
 
-      // --- NEW: CALCULATE RATINGS ---
       const reviews = data.reviews?.data || data.reviews || [];
-      
       const reviewCount = reviews.length;
       let averageRating = 0;
       
@@ -78,8 +79,9 @@ export default function Marketplace() {
         documentId: item.documentId || item.id,
         ...data,
         type: type,
+        seller: sellerData, // Attached seller data for the map
         sellerName: shopName,
-        mediaUrl: mediaUrl, // Now contains full URL
+        mediaUrl: mediaUrl, 
         isVideo: mimeType.startsWith('video/'),
         reviewCount: reviewCount, 
         rating: averageRating
@@ -93,14 +95,35 @@ export default function Marketplace() {
 
     const fetchData = async () => {
       try {
-        // We add populate=* to ensure we get the 'reviews' relation
         const p = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/products?populate=*`);
         const s = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/services?populate=*`);
         const l = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/livestreams?populate=*`);
 
         const products = normalizeData(p.data.data, 'product');
         const services = normalizeData(s.data.data, 'service');
-        
+        const allItems = [...products, ...services];
+        setItems(allItems);
+
+        // --- EXTRACT SELLER MAP LOCATIONS ---
+        const uniqueSellersMap = new Map();
+        allItems.forEach(item => {
+            const seller = item.seller;
+            if (seller && seller.shopLocation && !uniqueSellersMap.has(seller.id)) {
+                let loc = seller.shopLocation;
+                try { if(typeof loc === 'string') loc = JSON.parse(loc); } catch(e){}
+                if (loc && loc.lat && loc.lng) {
+                    uniqueSellersMap.set(seller.id, {
+                        id: seller.id,
+                        shopName: seller.shopName || seller.username,
+                        shopDescription: seller.shopDescription,
+                        lat: loc.lat,
+                        lng: loc.lng
+                    });
+                }
+            }
+        });
+        setSellersMapLocations(Array.from(uniqueSellersMap.values()));
+
         const activeStreams = l.data.data
           .map(item => {
              const d = item.attributes || item;
@@ -115,7 +138,6 @@ export default function Marketplace() {
           })
           .filter(stream => stream.isLive === true);
 
-        setItems([...products, ...services]);
         setStreams(activeStreams);
       } catch (e) { console.error("Fetch error", e); }
     };
@@ -129,10 +151,28 @@ export default function Marketplace() {
     router.refresh();
   };
 
-  const filteredItems = items.filter(item => 
+  // --- APPLY FILTERS & SORTING ---
+  let processedItems = items.filter(item => 
     (item.name || '').toLowerCase().includes(search.toLowerCase()) ||
     (item.sellerName || '').toLowerCase().includes(search.toLowerCase())
   );
+
+  if (typeFilter !== 'all') {
+      processedItems = processedItems.filter(item => item.type === typeFilter);
+  }
+
+  if (categoryFilter !== 'all') {
+      processedItems = processedItems.filter(item => item.category === categoryFilter);
+  }
+
+  if (sortPrice === 'low_to_high') {
+      processedItems.sort((a, b) => a.price - b.price);
+  } else if (sortPrice === 'high_to_low') {
+      processedItems.sort((a, b) => b.price - a.price);
+  }
+
+  // Generate available categories dynamically for the filter dropdown
+  const availableCategories = Array.from(new Set(items.map(i => i.category).filter(Boolean)));
 
   return (
     <div>
@@ -141,7 +181,7 @@ export default function Marketplace() {
       {/* --- NAVBAR --- */}
       <nav className="navbar">
         <Link href="/" className="nav-logo">
-           MSME<span style={{color:'#febd69'}}>.id</span>
+           MSME<span style={{color:'#2563eb'}}>.id</span>
         </Link>
         
         <div className="nav-search-container">
@@ -170,13 +210,12 @@ export default function Marketplace() {
                </div>
                
                {user.isSeller && (
-                 <Link href="/seller" className="nav-item" style={{border:'1px solid white', padding:'2px 5px'}}>
-                   <span>Seller</span>
-                   <span>Zone</span>
+                 <Link href="/seller" className="nav-item" style={{background:'#eff6ff', padding:'8px 12px', borderRadius:'12px'}}>
+                   <span style={{color: '#2563eb'}}>Seller Zone</span>
                  </Link>
                )}
 
-               <button onClick={handleLogout} style={{background:'none', border:'none', color:'white', fontWeight:'bold', cursor:'pointer'}}>
+               <button onClick={handleLogout} style={{background:'none', border:'none', color:'var(--danger-color)', fontWeight:'bold', cursor:'pointer', fontSize: '0.95rem'}}>
                  Sign Out
                </button>
              </>
@@ -186,21 +225,27 @@ export default function Marketplace() {
 
       <main className="container">
         
+        {/* --- GLOBAL STORE MAP --- */}
+        <div style={{marginBottom:'3rem'}}>
+            <h2 style={{fontSize:'1.8rem', color:'#0f172a', marginBottom:'1rem'}}>Explore Local Stores</h2>
+            <StoreMap sellers={sellersMapLocations} />
+        </div>
+
         {/* --- LIVE SECTION --- */}
         {streams.length > 0 && (
-          <div style={{ background:'white', padding:'1rem', marginBottom:'2rem', border:'1px solid #ddd' }}>
-              <h3 style={{margin:'0 0 1rem 0'}}>Amazon Live | MSME Edition</h3>
-              <div style={{display:'flex', gap:'1rem', overflowX:'auto'}}>
+          <div style={{ background:'white', padding:'1.5rem', marginBottom:'3rem', borderRadius:'16px', boxShadow:'var(--shadow-sm)', border: '1px solid #e2e8f0' }}>
+              <h3 style={{margin:'0 0 1.5rem 0', color:'#e11d48'}}>🔴 Amazon Live | MSME Edition</h3>
+              <div style={{display:'flex', gap:'1.5rem', overflowX:'auto', paddingBottom: '1rem'}}>
                 {streams.map((stream) => (
-                  <Link key={stream.id} href={`/live/${stream.documentId}`} style={{textDecoration:'none', color:'inherit', minWidth:'250px'}}>
-                    <div style={{position:'relative'}}>
-                      <div style={{height:'140px', background:'#232f3e', display:'flex', alignItems:'center', justifyContent:'center', color:'white'}}>
+                  <Link key={stream.id} href={`/live/${stream.documentId}`} style={{textDecoration:'none', color:'inherit', minWidth:'280px'}}>
+                    <div style={{position:'relative', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0', transition: 'all 0.2s'}} className="card-hover-effect">
+                      <div style={{height:'150px', background:'#0f172a', display:'flex', alignItems:'center', justifyContent:'center', color:'white', fontWeight: 'bold', fontSize: '1.1rem'}}>
                         ▶ Watch Live
                       </div>
-                      <div style={{padding:'0.5rem'}}>
-                        <span style={{color:'#cc0c39', fontWeight:'bold', fontSize:'0.8rem'}}>LIVE</span>
-                        <div style={{fontWeight:'bold'}}>{stream.title}</div>
-                        <div style={{fontSize:'0.8rem', color:'#565959'}}>{stream.sellerName}</div>
+                      <div style={{padding:'1rem', background: 'white'}}>
+                        <span style={{color:'#e11d48', fontWeight:'bold', fontSize:'0.85rem'}}>LIVE</span>
+                        <div style={{fontWeight:'bold', fontSize: '1.1rem', marginTop: '5px'}}>{stream.title}</div>
+                        <div style={{fontSize:'0.9rem', color:'#64748b', marginTop: '5px'}}>{stream.sellerName}</div>
                       </div>
                     </div>
                   </Link>
@@ -209,23 +254,52 @@ export default function Marketplace() {
           </div>
         )}
 
+        {/* --- FILTER & SORT BAR --- */}
+        <div style={{display:'flex', flexWrap:'wrap', gap:'1.5rem', marginBottom:'2rem', padding:'1rem 1.5rem', background:'white', borderRadius:'16px', boxShadow:'var(--shadow-sm)', border: '1px solid #e2e8f0', alignItems:'center'}}>
+            <strong style={{color: '#0f172a'}}>Filters:</strong>
+            
+            <select className="input-field" style={{width:'auto', padding:'0.6rem 1rem'}} value={typeFilter} onChange={(e) => {setTypeFilter(e.target.value); setCategoryFilter('all');}}>
+                <option value="all">All Types</option>
+                <option value="product">Products</option>
+                <option value="service">Services</option>
+            </select>
+
+            <select className="input-field" style={{width:'auto', padding:'0.6rem 1rem'}} value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+                <option value="all">All Categories</option>
+                {availableCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+            </select>
+
+            <div style={{marginLeft:'auto', display:'flex', alignItems:'center', gap:'10px'}}>
+                <strong style={{color: '#0f172a'}}>Sort By:</strong>
+                <select className="input-field" style={{width:'auto', padding:'0.6rem 1rem'}} value={sortPrice} onChange={(e) => setSortPrice(e.target.value)}>
+                    <option value="none">Relevance</option>
+                    <option value="low_to_high">Price: Low to High</option>
+                    <option value="high_to_low">Price: High to Low</option>
+                </select>
+            </div>
+        </div>
+
         {/* --- PRODUCT GRID --- */}
         <div className="grid-4">
-          {filteredItems.map((item) => (
+          {processedItems.length === 0 && (
+            <div style={{gridColumn:'1 / -1', textAlign:'center', padding:'4rem', color:'#64748b', fontSize: '1.2rem'}}>
+              No items found matching your filters.
+            </div>
+          )}
+
+          {processedItems.map((item) => (
             <div key={`${item.type}-${item.id}`} className="card">
               
               <Link href={`/item/${item.documentId}?type=${item.type}`} style={{textDecoration:'none', color:'inherit'}}>
                 <div className="card-image" style={{ cursor: 'pointer' }}>
                     {item.mediaUrl ? (
                       item.isVideo ? (
-                          // FIX: Removed process.env... prefix because item.mediaUrl is already full
                           <video src={item.mediaUrl} style={{maxWidth:'100%', maxHeight:'100%'}} />
                       ) : (
-                          // FIX: Removed process.env... prefix
                           <img src={item.mediaUrl} alt={item.name} style={{width:'100%', height:'100%', objectFit:'contain'}} />
                       )
                     ) : (
-                      <div style={{color:'#ccc', display:'flex', alignItems:'center', justifyContent:'center', height:'100%', background:'#f3f4f6'}}>No Image</div>
+                      <div style={{color:'#ccc', display:'flex', alignItems:'center', justifyContent:'center', height:'100%'}}>No Image</div>
                     )}
                 </div>
               </Link>
@@ -234,35 +308,35 @@ export default function Marketplace() {
                 <Link href={`/item/${item.documentId}?type=${item.type}`} style={{textDecoration:'none', color:'inherit'}}>
                    <h3 style={{cursor:'pointer'}}>{item.name}</h3>
                 </Link>
+
+                <span style={{fontSize:'0.8rem', background:'#e0e7ff', padding:'4px 10px', borderRadius:'12px', display:'inline-block', marginBottom:'8px', color:'#2563eb', fontWeight: 'bold'}}>
+                  {item.category || item.type.toUpperCase()}
+                </span>
                 
                 {/* --- RATING SECTION --- */}
-                <div style={{color:'#ffa41c', fontSize:'0.9rem', margin:'0.2rem 0', display:'flex', alignItems:'center', gap:'5px'}}>
-                   <span style={{fontSize:'1.1rem', letterSpacing:'-2px'}}>
+                <div style={{color:'#f59e0b', fontSize:'1rem', margin:'0.5rem 0', display:'flex', alignItems:'center', gap:'5px'}}>
+                   <span style={{letterSpacing:'-2px'}}>
                       {renderStars(item.rating || 0)}
                    </span>
-                   <span style={{color:'#333', fontSize:'0.8rem', fontWeight:'bold'}}>
+                   <span style={{color:'#333', fontSize:'0.9rem', fontWeight:'bold'}}>
                      {item.rating > 0 ? item.rating.toFixed(1) : ''}
                    </span>
-                   <span style={{color:'#007185', fontSize:'0.85rem'}}>
+                   <span style={{color:'#64748b', fontSize:'0.9rem'}}>
                       ({item.reviewCount || 0})
                    </span>
                 </div>
                 
                 <div className="price-tag">
-                   <span style={{fontSize:'0.8rem', position:'relative', top:'4px'}}>Rp</span>
-                   <span style={{fontWeight:'bold'}}>{item.price?.toLocaleString()}</span>
+                   <span style={{fontSize:'0.9rem', position:'relative', top:'2px'}}>Rp</span>
+                   <span style={{fontWeight:'800'}}>{item.price?.toLocaleString()}</span>
                 </div>
                 
                 <div className="seller-badge">
-                  Sold by {item.sellerName}
-                </div>
-                
-                <div style={{color:'#565959', fontSize:'0.8rem', marginBottom:'1rem'}}>
-                   Delivery by <span style={{fontWeight:'bold'}}>Tomorrow</span>
+                  Sold by <strong>{item.sellerName}</strong>
                 </div>
 
-                <Link href={`/item/${item.documentId}?type=${item.type}`} style={{width:'100%'}}>
-                   <button className="btn-primary" style={{width:'100%'}}>View Options</button>
+                <Link href={`/item/${item.documentId}?type=${item.type}`} style={{width:'100%', marginTop: 'auto'}}>
+                   <button className="btn-primary" style={{width:'100%'}}>View Details</button>
                 </Link>
               </div>
             </div>
