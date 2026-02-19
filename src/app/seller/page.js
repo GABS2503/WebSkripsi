@@ -3,6 +3,10 @@ import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
+
+// --- DYNAMIC IMPORT FOR MAP ---
+const MapPicker = dynamic(() => import('@/components/MapPicker'), { ssr: false });
 
 export default function SellerDashboard() {
   const router = useRouter();
@@ -23,9 +27,12 @@ export default function SellerDashboard() {
     selectedItemId: '' 
   });
   
+  // --- UPDATED SETTINGS DATA (Includes Map & Desc) ---
   const [settingsData, setSettingsData] = useState({
     midtransServerKey: '',
-    midtransClientKey: ''
+    midtransClientKey: '',
+    shopDescription: '',
+    shopLocation: { lat: null, lng: null }
   });
 
   const [variants, setVariants] = useState([]);
@@ -102,9 +109,18 @@ export default function SellerDashboard() {
       const user = JSON.parse(userStr);
       if (user.isSeller) {
         setIsLoading(false);
+
+        // Safely parse the saved location if it exists
+        let savedLoc = { lat: null, lng: null };
+        try { 
+            if(user.shopLocation) savedLoc = typeof user.shopLocation === 'string' ? JSON.parse(user.shopLocation) : user.shopLocation; 
+        } catch(e){}
+
         setSettingsData({
           midtransServerKey: user.midtransServerKey || '',
-          midtransClientKey: user.midtransClientKey || ''
+          midtransClientKey: user.midtransClientKey || '',
+          shopDescription: user.shopDescription || '',
+          shopLocation: savedLoc
         });
         resetForm(activeTab);
         fetchMyItems(); 
@@ -200,14 +216,35 @@ export default function SellerDashboard() {
   const handleMainMediaChange = (e) => { if (e.target.files) { const newFiles = Array.from(e.target.files); setFiles(prev => [...prev, ...newFiles]); const newPreviews = newFiles.map(file => URL.createObjectURL(file)); setPreviews(prev => [...prev, ...newPreviews]); } };
   const removeImage = (index) => { setFiles(prev => prev.filter((_, i) => i !== index)); setPreviews(prev => prev.filter((_, i) => i !== index)); };
 
+  // --- UPDATED SAVE SETTINGS ---
   const handleSaveSettings = async (e) => {
     e.preventDefault(); setIsSubmitting(true);
-    const token = localStorage.getItem('token'); const user = JSON.parse(localStorage.getItem('user'));
+    const token = localStorage.getItem('token'); 
+    const user = JSON.parse(localStorage.getItem('user'));
+    
+    if(!settingsData.shopLocation.lat) {
+        alert("Please pin your store location on the map before saving.");
+        setIsSubmitting(false);
+        return;
+    }
+
     try {
-      const res = await axios.put(`${process.env.NEXT_PUBLIC_API_URL}/api/users/${user.id}`, { midtransServerKey: settingsData.midtransServerKey, midtransClientKey: settingsData.midtransClientKey }, { headers: { Authorization: `Bearer ${token}` } });
-      const updatedUser = { ...user, ...res.data }; localStorage.setItem('user', JSON.stringify(updatedUser));
-      alert("Payment settings saved!");
-    } catch (err) { console.error(err); alert("Failed to save settings."); } finally { setIsSubmitting(false); }
+      const res = await axios.put(`${process.env.NEXT_PUBLIC_API_URL}/api/users/${user.id}`, { 
+          midtransServerKey: settingsData.midtransServerKey, 
+          midtransClientKey: settingsData.midtransClientKey,
+          shopDescription: settingsData.shopDescription,
+          shopLocation: settingsData.shopLocation // Save location to DB
+      }, { headers: { Authorization: `Bearer ${token}` } });
+      
+      const updatedUser = { ...user, ...res.data }; 
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      alert("Settings successfully saved!");
+    } catch (err) { 
+      console.error(err); 
+      alert("Failed to save settings. Please try again."); 
+    } finally { 
+      setIsSubmitting(false); 
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -305,23 +342,49 @@ export default function SellerDashboard() {
           <div className="tab-group">
             <button onClick={() => { setActiveTab('product'); resetForm('product'); }} className={`tab-btn ${activeTab === 'product' ? 'active' : ''}`}>Product</button>
             <button onClick={() => { setActiveTab('service'); resetForm('service'); }} className={`tab-btn ${activeTab === 'service' ? 'active' : ''}`}>Service</button>
-            <button onClick={() => { setActiveTab('livestream'); resetForm('livestream'); }} className={`tab-btn ${activeTab === 'livestream' ? 'active' : ''}`} style={{borderColor:'#ef4444', color: activeTab==='livestream' ? 'white' : '#ef4444', background: activeTab==='livestream' ? '#ef4444' : 'white'}}>Go Live</button>
-            <button onClick={() => { setActiveTab('settings'); }} className={`tab-btn ${activeTab === 'settings' ? 'active' : ''}`} style={{background: activeTab==='settings'?'#eef2ff':'transparent'}}>⚙️ Payment Settings</button>
+            <button onClick={() => { setActiveTab('livestream'); resetForm('livestream'); }} className={`tab-btn ${activeTab === 'livestream' ? 'active' : ''}`} style={{borderColor:'#ef4444', color: activeTab==='livestream' ? 'white' : '#ef4444', background: activeTab==='livestream' ? '#ef4444' : 'transparent'}}>Go Live</button>
+            <button onClick={() => { setActiveTab('settings'); }} className={`tab-btn ${activeTab === 'settings' ? 'active' : ''}`}>⚙️ Settings</button>
           </div>
 
           {activeTab === 'settings' ? (
             <div style={{animation:'fadeIn 0.3s'}}>
-              <h2 style={{textAlign:'center'}}>Payment Configuration</h2>
+              <h2 style={{textAlign:'center', marginBottom: '2rem'}}>Store & Payment Profile</h2>
               <form onSubmit={handleSaveSettings}>
-                <div className="form-group">
-                  <label>Midtrans Server Key</label>
-                  <input className="input-field" type="password" value={settingsData.midtransServerKey} onChange={e => setSettingsData({...settingsData, midtransServerKey: e.target.value})} required />
+                
+                {/* PAYMENT SECTION */}
+                <div className="form-section">
+                    <h3 className="section-title">Midtrans Payment Keys</h3>
+                    <div className="form-group">
+                      <label>Server Key</label>
+                      <input className="input-field" type="password" value={settingsData.midtransServerKey} onChange={e => setSettingsData({...settingsData, midtransServerKey: e.target.value})} required />
+                    </div>
+                    <div className="form-group">
+                      <label>Client Key</label>
+                      <input className="input-field" value={settingsData.midtransClientKey} onChange={e => setSettingsData({...settingsData, midtransClientKey: e.target.value})} required />
+                    </div>
                 </div>
-                <div className="form-group">
-                  <label>Midtrans Client Key</label>
-                  <input className="input-field" value={settingsData.midtransClientKey} onChange={e => setSettingsData({...settingsData, midtransClientKey: e.target.value})} required />
+
+                {/* STORE LOCATION SECTION */}
+                <div className="form-section">
+                    <h3 className="section-title">Store Details</h3>
+                    <div className="form-group">
+                        <label>What does your store sell? (Short Description)</label>
+                        <textarea className="input-field" rows={3} placeholder="e.g. We sell handmade clothing and authentic local crafts." value={settingsData.shopDescription} onChange={e => setSettingsData({...settingsData, shopDescription: e.target.value})} required />
+                    </div>
+                    <div className="form-group" style={{marginTop: '1.5rem'}}>
+                        <label>Pin Your Physical Store Location</label>
+                        <MapPicker onLocationSelect={(loc) => setSettingsData({...settingsData, shopLocation: loc})} />
+                        {settingsData.shopLocation.lat ? (
+                           <div style={{marginTop:'10px', color:'var(--success-color)', fontWeight:'bold'}}>✅ Location Pinned</div>
+                        ) : (
+                           <div style={{marginTop:'10px', color:'var(--danger-color)', fontWeight:'bold'}}>❌ Please pin your location on the map</div>
+                        )}
+                    </div>
                 </div>
-                <button type="submit" className="btn-primary" style={{marginTop:'1rem'}}>Save Keys</button>
+
+                <button type="submit" className="btn-primary" style={{marginTop:'1rem'}} disabled={isSubmitting}>
+                    {isSubmitting ? 'Saving...' : 'Save All Settings'}
+                </button>
               </form>
             </div>
           ) : (
@@ -531,11 +594,6 @@ export default function SellerDashboard() {
         )}
 
       </div>
-      <style jsx>{`
-        .form-section { background: #f9fafb; padding: 1rem; border-radius: 8px; border: 1px solid #e5e7eb; margin-bottom: 1.5rem; }
-        .section-title { margin: 0 0 1rem 0; font-size: 1rem; color: #374151; border-bottom: 1px solid #e5e7eb; padding-bottom: 0.5rem; }
-        .variant-box { background: white; padding: 0.75rem; border: 1px solid #e5e7eb; border-radius: 6px; margin-bottom: 0.5rem; }
-      `}</style>
     </div>
   );
 }
