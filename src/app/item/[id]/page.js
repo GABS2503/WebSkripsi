@@ -6,9 +6,9 @@ import Link from 'next/link';
 import Script from 'next/script';
 import ProductReviews from '@/components/ProductReviews';
 import { useCart } from '@/context/CartContext';
-import dynamic from 'next/dynamic'; // Required for Map
+import dynamic from 'next/dynamic';
 
-// --- DYNAMIC IMPORT FOR MAP (Prevents Server-Side Errors) ---
+// --- DYNAMIC IMPORT FOR MAP ---
 const MapPicker = dynamic(() => import('@/components/MapPicker'), { ssr: false });
 
 // --- SMART IMAGE HELPER ---
@@ -37,9 +37,8 @@ export default function ItemDetails() {
   const [selectedVariants, setSelectedVariants] = useState({}); 
   const [activeImageIndex, setActiveImageIndex] = useState(0);
 
-  // --- UPDATED STATE FOR OPTIONS & LOCATION ---
+  // --- OPTIONS & LOCATION STATE ---
   const [deliveryType, setDeliveryType] = useState(''); 
-  // Added lat/lng to customerInfo
   const [customerInfo, setCustomerInfo] = useState({ name: '', address: '', lat: null, lng: null });
 
   useEffect(() => {
@@ -113,7 +112,6 @@ export default function ItemDetails() {
     }
   };
 
-  // --- ADD TO CART HANDLER (Updated Validation) ---
   const handleAddToCart = () => {
     const name = item?.name || item?.attributes?.name;
     const variantData = item?.variantData || item?.attributes?.variantData || [];
@@ -135,14 +133,13 @@ export default function ItemDetails() {
       return;
     }
     
-    // VALIDATE LOCATION PIN if Delivery/Home Service
     if ((deliveryType === 'shipping' || deliveryType === 'home_service')) {
         if (!customerInfo.lat || !customerInfo.lng) {
             alert("Please pin your location on the map.");
             return;
         }
         if (!customerInfo.address) {
-            alert("Please provide address details (e.g. Unit number, Color of house).");
+            alert("Please provide address details (e.g. Unit number).");
             return;
         }
     }
@@ -171,8 +168,8 @@ export default function ItemDetails() {
     addToCart(cartPayload, options, customerInfo);
   };
 
-  if (loading) return <div className="container" style={{padding:'2rem', textAlign:'center'}}>Loading...</div>;
-  if (!item) return <div className="container" style={{padding:'2rem', textAlign:'center'}}>Item not found.</div>;
+  if (loading) return <div className="container" style={{padding:'2rem', textAlign:'center', color: '#000', fontSize: '1.2rem'}}>Loading...</div>;
+  if (!item) return <div className="container" style={{padding:'2rem', textAlign:'center', color: '#000', fontSize: '1.2rem'}}>Item not found.</div>;
 
   const data = item.attributes || item;
   const sellerRaw = data.seller?.data?.attributes || data.seller || {};
@@ -202,20 +199,20 @@ export default function ItemDetails() {
   const activeMedia = mediaList[activeImageIndex] || mediaList[0] || null;
 
   return (
-    <div style={{ background: '#f3f4f6', minHeight: '100vh' }}>
+    <div style={{ background: '#f3f4f6', minHeight: '100vh', color: '#000' }}>
       <nav className="navbar">
-        <h1 style={{ margin:0 }}>MSME Market</h1>
+        <h1 style={{ margin:0, color: '#2563eb' }}>MSME Market</h1>
         <div style={{display:'flex', gap:'20px'}}>
-            <Link href="/cart" style={{color:'white', fontWeight:'bold', textDecoration:'none'}}>🛒 Cart</Link>
-            <Link href="/" style={{color:'white', textDecoration:'none', fontWeight:'bold'}}>&larr; Back</Link>
+            <Link href="/cart" style={{color:'#000', fontWeight:'bold', textDecoration:'none', fontSize: '1.1rem'}}>🛒 Cart</Link>
+            <Link href="/" style={{color:'#000', textDecoration:'none', fontWeight:'bold', fontSize: '1.1rem'}}>&larr; Back</Link>
         </div>
       </nav>
 
       <main className="container" style={{ marginTop: '2rem' }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2rem', background: 'white', padding: '2rem', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3rem', background: 'white', padding: '2.5rem', borderRadius: '12px', boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }}>
           
-          <div style={{ flex: '1 1 400px' }}>
-            <div style={{ width: '100%', height: '400px', background: 'white', borderRadius: '8px', border: '1px solid #eee', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginBottom: '1rem' }}>
+          <div style={{ flex: '1 1 450px' }}>
+            <div style={{ width: '100%', height: '450px', background: '#f9fafb', borderRadius: '12px', border: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginBottom: '1rem' }}>
               {activeMedia ? (
                  activeMedia.isVideo ? (
                    <video controls src={activeMedia.url} style={{maxWidth:'100%', maxHeight:'100%'}} />
@@ -223,47 +220,51 @@ export default function ItemDetails() {
                    <img src={activeMedia.url} alt={data.name} style={{maxWidth:'100%', maxHeight:'100%', objectFit:'contain'}} />
                  )
               ) : (
-                 <div style={{width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center', color:'#666', flexDirection:'column'}}>
+                 <div style={{width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center', color:'#000', flexDirection:'column'}}>
                    <span style={{fontSize:'3rem'}}>📷</span>
-                   <span>No Media</span>
+                   <span style={{fontSize: '1.2rem', marginTop: '10px'}}>No Media</span>
                  </div>
               )}
             </div>
 
             {mediaList.length > 1 && (
-              <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
+              <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
                 {mediaList.map((media, index) => (
-                  <div key={index} onClick={() => setActiveImageIndex(index)} style={{width: '60px', height: '60px', borderRadius: '4px', border: activeImageIndex === index ? '2px solid #e77600' : '1px solid #ddd', cursor: 'pointer', overflow: 'hidden', flexShrink: 0}}>
-                    {media.isVideo ? <div style={{width:'100%', height:'100%', background:'#000', color:'white', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.7rem'}}>VID</div> : <img src={media.url} alt="thumb" style={{width:'100%', height:'100%', objectFit:'cover'}} />}
+                  <div key={index} onClick={() => setActiveImageIndex(index)} style={{width: '70px', height: '70px', borderRadius: '6px', border: activeImageIndex === index ? '3px solid #2563eb' : '1px solid #ddd', cursor: 'pointer', overflow: 'hidden', flexShrink: 0}}>
+                    {media.isVideo ? <div style={{width:'100%', height:'100%', background:'#000', color:'white', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.8rem'}}>VID</div> : <img src={media.url} alt="thumb" style={{width:'100%', height:'100%', objectFit:'cover'}} />}
                   </div>
                 ))}
               </div>
             )}
           </div>
 
-          <div style={{ flex: '1 1 400px' }}>
-            <h1 style={{ marginTop: 0, color: '#111827' }}>{data.name}</h1>
-            <p style={{ color: '#007185', fontSize: '0.9rem' }}>
-              Sold by: <strong>{sellerName}</strong>
+          {/* --- TEXT CONTENT RIGHT PANEL --- */}
+          <div style={{ flex: '1 1 450px' }}>
+            <h1 style={{ marginTop: 0, color: '#000', fontSize: '2.2rem', fontWeight: '800' }}>{data.name}</h1>
+            <p style={{ color: '#000', fontSize: '1.1rem', marginBottom: '1.5rem' }}>
+              Sold by: <strong style={{color: '#2563eb'}}>{sellerName}</strong>
             </p>
 
-            <hr style={{ margin: '1rem 0', borderColor: '#e5e7eb' }} />
+            <hr style={{ margin: '1.5rem 0', borderColor: '#e5e7eb' }} />
 
-            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#B12704' }}>
+            <div style={{ fontSize: '2rem', fontWeight: '900', color: '#000', marginBottom: '1.5rem' }}>
               Rp {data.price?.toLocaleString()}
             </div>
 
-            <p style={{ lineHeight: '1.6', color: '#374151', whiteSpace: 'pre-line' }}>
+            <p style={{ lineHeight: '1.8', color: '#000', whiteSpace: 'pre-line', fontSize: '1.15rem', marginBottom: '2rem' }}>
               {data.description || "No description provided."}
             </p>
 
             {attributes.length > 0 && (
-              <div style={{ margin: '1.5rem 0' }}>
-                <h4 style={{ marginBottom: '0.5rem' }}>Specifications:</h4>
-                <table style={{ width: '100%', fontSize: '0.9rem', borderCollapse: 'collapse' }}>
+              <div style={{ margin: '2rem 0' }}>
+                <h4 style={{ marginBottom: '1rem', fontSize: '1.2rem', color: '#000' }}>Specifications:</h4>
+                <table style={{ width: '100%', fontSize: '1.1rem', borderCollapse: 'collapse', color: '#000' }}>
                   <tbody>
                     {attributes.map((attr, i) => (
-                      <tr key={i} style={{ borderBottom: '1px solid #eee' }}><td style={{ padding: '8px', fontWeight: 'bold', color: '#555', width: '40%' }}>{attr.key}</td><td style={{ padding: '8px' }}>{attr.value}</td></tr>
+                      <tr key={i} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                        <td style={{ padding: '12px 0', fontWeight: 'bold', width: '40%', color: '#000' }}>{attr.key}</td>
+                        <td style={{ padding: '12px 0', color: '#000' }}>{attr.value}</td>
+                      </tr>
                     ))}
                   </tbody>
                 </table>
@@ -271,17 +272,19 @@ export default function ItemDetails() {
             )}
 
             {variants.map((variant, i) => (
-              <div key={i} style={{ marginBottom: '1rem' }}>
-                <div style={{ fontWeight: 'bold', marginBottom: '0.5rem' }}>{variant.name}: <span style={{fontWeight:'normal'}}>{selectedVariants[variant.name]}</span></div>
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <div key={i} style={{ marginBottom: '1.5rem' }}>
+                <div style={{ fontWeight: 'bold', marginBottom: '0.8rem', fontSize: '1.1rem', color: '#000' }}>
+                  {variant.name}: <span style={{fontWeight:'normal'}}>{selectedVariants[variant.name]}</span>
+                </div>
+                <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap' }}>
                   {variant.options.map((option, idx) => {
                     const isObject = typeof option === 'object' && option !== null;
                     const name = isObject ? option.name : option;
                     const image = isObject ? option.image : null;
                     const isSelected = selectedVariants[variant.name] === name;
                     return (
-                      <button key={idx} onClick={() => handleVariantSelect(variant.name, name)} style={{padding: '0.5rem 1rem', border: isSelected ? '2px solid #e77600' : '1px solid #d1d5db', background: isSelected ? '#fff4e3' : 'white', borderRadius: '4px', cursor: 'pointer', fontWeight: isSelected ? 'bold' : 'normal', display: 'flex', alignItems: 'center', gap: '8px'}}>
-                        {image && <img src={getImageUrl(image.url)} alt={name} style={{width:'24px', height:'24px', objectFit:'cover', borderRadius:'4px', border:'1px solid #eee'}} />}
+                      <button key={idx} onClick={() => handleVariantSelect(variant.name, name)} style={{padding: '0.6rem 1.2rem', fontSize: '1.05rem', color: '#000', border: isSelected ? '2px solid #2563eb' : '1px solid #d1d5db', background: isSelected ? '#eff6ff' : 'white', borderRadius: '6px', cursor: 'pointer', fontWeight: isSelected ? 'bold' : 'normal', display: 'flex', alignItems: 'center', gap: '8px'}}>
+                        {image && <img src={getImageUrl(image.url)} alt={name} style={{width:'28px', height:'28px', objectFit:'cover', borderRadius:'4px', border:'1px solid #eee'}} />}
                         {name}
                       </button>
                     )
@@ -290,46 +293,45 @@ export default function ItemDetails() {
               </div>
             ))}
 
-            <div style={{ marginTop: '2rem', padding: '1.5rem', border: '1px solid #d1d5db', borderRadius: '8px', background: 'white', boxShadow:'0 2px 5px rgba(0,0,0,0.05)' }}>
+            <div style={{ marginTop: '2.5rem', padding: '2rem', border: '1px solid #d1d5db', borderRadius: '12px', background: '#fafafa' }}>
               {isOutOfStock ? (
-                <h3 style={{ color: '#ef4444', marginTop:0 }}>Currently Unavailable</h3>
+                <h3 style={{ color: '#ef4444', marginTop:0, fontSize: '1.5rem' }}>Currently Unavailable</h3>
               ) : (
                 <>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
-                    <span style={{ fontWeight: 'bold' }}>Quantity:</span>
-                    <select value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
+                    <span style={{ fontWeight: 'bold', fontSize: '1.15rem', color: '#000' }}>Quantity:</span>
+                    <select value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} style={{ padding: '0.6rem 1rem', borderRadius: '6px', border: '1px solid #ccc', fontSize: '1.1rem', color: '#000', background: '#fff', cursor: 'pointer' }}>
                       {[...Array(Math.min(10, type === 'product' ? maxStock : 10)).keys()].map(n => <option key={n+1} value={n+1}>{n+1}</option>)}
                     </select>
                   </div>
-                  {type === 'product' && <div style={{ color: '#166534', fontWeight: 'bold', fontSize: '0.9rem', marginBottom: '1rem' }}>{maxStock > 10 ? 'In Stock' : `Only ${maxStock} left in stock - order soon`}</div>}
 
-                  <hr style={{margin:'1.5rem 0', borderColor:'#eee'}}/>
+                  <hr style={{margin:'2rem 0', borderColor:'#d1d5db'}}/>
 
                   {/* --- DELIVERY / SERVICE OPTIONS --- */}
-                  <div style={{ marginBottom: '1rem' }}>
-                    <label style={{fontWeight:'bold', display:'block', marginBottom:'0.5rem'}}>
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <label style={{fontWeight:'bold', display:'block', marginBottom:'1rem', fontSize: '1.15rem', color: '#000'}}>
                         {type === 'product' ? 'Collection Method:' : 'Service Location:'}
                     </label>
-                    <div style={{display:'flex', gap:'10px', flexDirection:'column'}}>
+                    <div style={{display:'flex', gap:'15px', flexDirection:'column'}}>
                         {type === 'product' ? (
                             <>
-                                <label style={{cursor:'pointer', display:'flex', gap:'8px', alignItems:'center'}}>
-                                    <input type="radio" name="del_opt" value="pickup" onChange={(e)=>setDeliveryType(e.target.value)} /> 
+                                <label style={{cursor:'pointer', display:'flex', gap:'10px', alignItems:'center', fontSize: '1.1rem', color: '#000'}}>
+                                    <input type="radio" name="del_opt" value="pickup" onChange={(e)=>setDeliveryType(e.target.value)} style={{width: '20px', height: '20px'}} /> 
                                     🏪 Buy in Place (Pickup)
                                 </label>
-                                <label style={{cursor:'pointer', display:'flex', gap:'8px', alignItems:'center'}}>
-                                    <input type="radio" name="del_opt" value="shipping" onChange={(e)=>setDeliveryType(e.target.value)} /> 
+                                <label style={{cursor:'pointer', display:'flex', gap:'10px', alignItems:'center', fontSize: '1.1rem', color: '#000'}}>
+                                    <input type="radio" name="del_opt" value="shipping" onChange={(e)=>setDeliveryType(e.target.value)} style={{width: '20px', height: '20px'}} /> 
                                     🚚 Take Away (Delivery)
                                 </label>
                             </>
                         ) : (
                             <>
-                                <label style={{cursor:'pointer', display:'flex', gap:'8px', alignItems:'center'}}>
-                                    <input type="radio" name="del_opt" value="onsite" onChange={(e)=>setDeliveryType(e.target.value)} /> 
+                                <label style={{cursor:'pointer', display:'flex', gap:'10px', alignItems:'center', fontSize: '1.1rem', color: '#000'}}>
+                                    <input type="radio" name="del_opt" value="onsite" onChange={(e)=>setDeliveryType(e.target.value)} style={{width: '20px', height: '20px'}} /> 
                                     🚶 I go to Seller
                                 </label>
-                                <label style={{cursor:'pointer', display:'flex', gap:'8px', alignItems:'center'}}>
-                                    <input type="radio" name="del_opt" value="home_service" onChange={(e)=>setDeliveryType(e.target.value)} /> 
+                                <label style={{cursor:'pointer', display:'flex', gap:'10px', alignItems:'center', fontSize: '1.1rem', color: '#000'}}>
+                                    <input type="radio" name="del_opt" value="home_service" onChange={(e)=>setDeliveryType(e.target.value)} style={{width: '20px', height: '20px'}} /> 
                                     🏠 Seller comes to Me
                                 </label>
                             </>
@@ -337,35 +339,31 @@ export default function ItemDetails() {
                     </div>
                   </div>
 
-                  {/* --- CUSTOMER INFO FORM WITH MAP --- */}
+                  {/* --- CUSTOMER INFO FORM --- */}
                   {deliveryType && (
-                    <div style={{ background:'#f9fafb', padding:'15px', borderRadius:'6px', marginBottom:'1.5rem', border:'1px solid #e5e7eb' }}>
-                        <div style={{marginBottom:'10px'}}>
-                            <label style={{fontSize:'0.9rem', fontWeight:'bold'}}>Your Name</label>
+                    <div style={{ background:'white', padding:'20px', borderRadius:'8px', marginBottom:'2rem', border:'1px solid #d1d5db' }}>
+                        <div style={{marginBottom:'15px'}}>
+                            <label style={{fontSize:'1.1rem', fontWeight:'bold', color: '#000', display: 'block', marginBottom: '8px'}}>Your Name</label>
                             <input 
                                 type="text" 
-                                placeholder="Enter your name"
-                                style={{width:'100%', padding:'8px', border:'1px solid #ccc', borderRadius:'4px', marginTop:'4px'}}
+                                placeholder="Enter your full name"
+                                style={{width:'100%', padding:'12px', border:'1px solid #9ca3af', borderRadius:'6px', fontSize: '1.05rem', color: '#000'}}
                                 value={customerInfo.name}
                                 onChange={(e) => setCustomerInfo({...customerInfo, name: e.target.value})}
                             />
                         </div>
 
-                        {/* MAP LOGIC */}
                         {(deliveryType === 'shipping' || deliveryType === 'home_service') && (
                             <div>
-                                <label style={{fontSize:'0.9rem', fontWeight:'bold', display:'block', marginBottom:'5px'}}>
-                                    Pin Location ({deliveryType === 'shipping' ? 'Delivery Destination' : 'Service Location'})
+                                <label style={{fontSize:'1.1rem', fontWeight:'bold', display:'block', marginBottom:'8px', color: '#000'}}>
+                                    Pin Location
                                 </label>
-                                
-                                {/* MAP COMPONENT */}
                                 <MapPicker onLocationSelect={(loc) => setCustomerInfo({ ...customerInfo, lat: loc.lat, lng: loc.lng })} />
-
-                                <label style={{fontSize:'0.9rem', fontWeight:'bold', display:'block', marginTop:'10px'}}>Detail Address (Unit/Floor/Note)</label>
+                                <label style={{fontSize:'1.1rem', fontWeight:'bold', display:'block', marginTop:'15px', marginBottom: '8px', color: '#000'}}>Detail Address</label>
                                 <textarea 
                                     placeholder="e.g. White fence, Unit 4B"
-                                    style={{width:'100%', padding:'8px', border:'1px solid #ccc', borderRadius:'4px', marginTop:'4px'}}
-                                    rows={2}
+                                    style={{width:'100%', padding:'12px', border:'1px solid #9ca3af', borderRadius:'6px', fontSize: '1.05rem', color: '#000'}}
+                                    rows={3}
                                     value={customerInfo.address}
                                     onChange={(e) => setCustomerInfo({...customerInfo, address: e.target.value})}
                                 />
@@ -374,16 +372,18 @@ export default function ItemDetails() {
                     </div>
                   )}
 
-                  <button onClick={handleChat} style={{ width: '100%', borderRadius: '20px', padding: '0.8rem', background: 'white', border: '1px solid #d1d5db', marginBottom: '0.8rem', cursor: 'pointer', fontWeight: 'bold', color: '#333' }}>Chat with Seller</button>
-                  <button onClick={handleAddToCart} className="btn-primary" style={{ width: '100%', borderRadius: '20px', padding: '0.8rem' }}>Add to Cart</button>
+                  <button onClick={handleChat} style={{ width: '100%', borderRadius: '50px', padding: '1rem', background: 'white', border: '2px solid #000', marginBottom: '1rem', cursor: 'pointer', fontWeight: 'bold', color: '#000', fontSize: '1.1rem', transition: 'all 0.2s' }}>
+                    Chat with Seller
+                  </button>
+                  <button onClick={handleAddToCart} className="btn-primary" style={{ width: '100%', borderRadius: '50px', padding: '1rem', fontSize: '1.15rem' }}>
+                    Add to Cart
+                  </button>
                 </>
               )}
             </div>
           </div>
         </div>
-
         <ProductReviews itemId={item.documentId || item.id} itemType={type} />
-
       </main>
 
       {sellerClientKey && (
