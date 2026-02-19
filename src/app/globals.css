@@ -1,422 +1,318 @@
 /* src/app/globals.css */
 
 :root {
-  /* --- PREMIUM COLOR PALETTE --- */
-  --brand-primary: #4f46e5;      /* Rich Indigo */
-  --brand-hover: #4338ca;        /* Deeper Indigo */
-  --brand-light: #e0e7ff;        /* Soft Indigo Tint */
+  /* Ultra-modern monochrome palette with a vibrant accent */
+  --bg-page: #fcfcfd;            /* Almost white, very clean */
+  --bg-element: #ffffff;         /* Pure white for cards */
+  --bg-muted: #f4f4f5;           /* Soft gray for inputs/tabs */
   
-  --dark-bg: #0f172a;            /* Midnight Slate (Navbar) */
-  --light-bg: #f8fafc;           /* Very Light Cool Gray (Background) */
-  --surface-white: #ffffff;      /* Pure White */
+  --text-main: #09090b;          /* Pitch black for ultimate contrast */
+  --text-secondary: #71717a;     /* Soft slate for descriptions */
   
-  --text-strong: #0f172a;        /* High Contrast Text */
-  --text-base: #334155;          /* Standard Body Text */
-  --text-muted: #64748b;         /* Secondary Text */
+  --accent-color: #6366f1;       /* Vibrant Indigo for focus states */
+  --action-primary: #09090b;     /* Black buttons */
+  --action-hover: #27272a;       /* Slightly lighter black on hover */
   
-  --border-light: #e2e8f0;       /* Subtle Borders */
-  --border-focus: #818cf8;       /* Input Focus Ring */
-  
-  --price-accent: #e11d48;       /* Elegant Red for Prices */
-  --success-green: #059669;      /* Refined Green */
-  --danger-bg: #fef2f2;
-  --danger-text: #dc2626;
+  --danger-color: #ef4444;
+  --success-color: #10b981;
 
-  /* --- SPACING & SHAPES --- */
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-pill: 9999px;
+  /* Smooth, modern curves */
+  --radius-sm: 12px;
+  --radius-md: 24px;
+  --radius-pill: 999px;
 
-  /* --- MODERN LAYERED SHADOWS --- */
-  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
-  --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.06), 0 2px 4px -2px rgba(15, 23, 42, 0.02);
-  --shadow-lg: 0 12px 24px -4px rgba(15, 23, 42, 0.08);
-  --shadow-hover: 0 20px 25px -5px rgba(15, 23, 42, 0.1), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
-
-  /* --- TRANSITIONS --- */
-  --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-fast: all 0.15s ease-out;
+  /* Cinematic floating shadows */
+  --shadow-float: 0 10px 40px -10px rgba(0, 0, 0, 0.05);
+  --shadow-hover: 0 20px 40px -10px rgba(0, 0, 0, 0.12);
+  --shadow-glass: 0 4px 30px rgba(0, 0, 0, 0.05);
 }
 
 body {
   margin: 0;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  background-color: var(--light-bg);
-  color: var(--text-base);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: var(--bg-page);
+  color: var(--text-main);
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  line-height: 1.6;
 }
 
 /* =========================================
-   NAVBAR (Sleek Glassmorphism)
+   1. THE FLOATING NAVBAR (Completely New Look)
    ========================================= */
 .navbar {
-  background-color: rgba(15, 23, 42, 0.85);
-  color: white;
-  padding: 1rem 2rem;
+  background-color: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  max-width: 1200px;
+  margin: 1.5rem auto; /* Floats away from the edges */
+  padding: 0.75rem 1.5rem;
   display: flex;
   align-items: center;
-  gap: 2rem;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.nav-logo {
-  font-size: 1.5rem;
-  font-weight: 800;
-  color: white;
-  text-decoration: none;
-  letter-spacing: -0.02em;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.nav-search-container {
-  flex-grow: 1;
-  display: flex;
+  justify-content: space-between;
   border-radius: var(--radius-pill);
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  transition: var(--transition-smooth);
-  max-width: 600px;
+  box-shadow: var(--shadow-glass);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  position: sticky;
+  top: 1.5rem;
+  z-index: 100;
 }
 
-.nav-search-container:focus-within {
-  background: var(--surface-white);
-  border-color: var(--brand-primary);
-  box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.2);
+.navbar h1, .nav-logo {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--text-main);
+  margin: 0;
+  letter-spacing: -0.5px;
 }
 
-.nav-search-input {
-  width: 100%;
-  padding: 0.75rem 1.25rem;
-  border: none;
-  outline: none;
-  font-size: 0.95rem;
-  background: transparent;
-  color: white;
+/* Navbar Links (now dark text) */
+.navbar a {
+  color: var(--text-secondary) !important;
+  font-weight: 600 !important;
+  transition: color 0.2s;
 }
 
-.nav-search-container:focus-within .nav-search-input {
-  color: var(--text-strong);
+.navbar a:hover {
+  color: var(--text-main) !important;
 }
 
-.nav-search-btn {
-  background-color: transparent;
-  border: none;
-  padding: 0 1.5rem;
-  cursor: pointer;
-  color: #94a3b8;
-  transition: var(--transition-fast);
-  font-weight: bold;
-}
-
-.nav-search-container:focus-within .nav-search-btn {
-  color: var(--brand-primary);
-}
-
-.nav-links {
-  display: flex;
-  align-items: center;
-  gap: 1.5rem;
+/* Special styling for buttons inside navbar */
+.navbar a[style*="background"] {
+  background: var(--bg-muted) !important;
+  color: var(--text-main) !important;
+  border-radius: var(--radius-pill) !important;
+  padding: 0.6rem 1.2rem !important;
 }
 
 /* =========================================
-   LAYOUT & GRID
+   2. GRID & LAYOUT
    ========================================= */
 .container {
-  max-width: 1280px;
+  max-width: 1200px; /* Tighter, more curated width */
   margin: 0 auto;
-  padding: 2rem;
+  padding: 2rem 1rem;
 }
 
 .grid-4 {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 2rem;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 2.5rem; /* More breathing room between cards */
 }
 
 /* =========================================
-   MODERN PRODUCT CARDS
+   3. BORDERLESS FLOATING CARDS
    ========================================= */
 .card {
-  background: var(--surface-white);
-  border: 1px solid rgba(0,0,0,0.04);
+  background: var(--bg-element);
   border-radius: var(--radius-md);
+  padding: 1rem;
   display: flex;
   flex-direction: column;
-  padding: 1.25rem;
-  transition: var(--transition-smooth);
-  height: 100%;
-  box-shadow: var(--shadow-sm);
-  position: relative;
+  box-shadow: var(--shadow-float);
+  border: none;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s ease;
+  will-change: transform;
 }
 
 .card:hover {
-  transform: translateY(-6px);
+  transform: translateY(-8px) scale(1.02); /* Floats up and slightly enlarges */
   box-shadow: var(--shadow-hover);
-  border-color: var(--border-light);
 }
 
 .card-image {
-  height: 200px;
+  height: 240px;
   width: 100%;
+  background: var(--bg-muted);
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 1.25rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 1.25rem;
-  background: linear-gradient(to bottom right, #f8fafc, #f1f5f9);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  padding: 1rem;
-  box-sizing: border-box;
 }
 
 .card-image img {
-  max-height: 100%;
-  max-width: 100%;
-  object-fit: contain;
-  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* Edge-to-edge images look much more modern */
+  transition: transform 0.6s ease;
 }
 
 .card:hover .card-image img {
-  transform: scale(1.08);
+  transform: scale(1.05);
 }
 
-.card-body h3 {
+.card h3 {
   font-size: 1.1rem;
-  font-weight: 600;
-  line-height: 1.4;
-  margin: 0 0 0.5rem 0;
-  color: var(--text-strong);
+  font-weight: 700;
+  margin: 0 0 0.25rem 0;
+  color: var(--text-main);
+  letter-spacing: -0.3px;
 }
 
-.price-tag {
-  color: var(--text-strong);
-  font-size: 1.35rem;
-  font-weight: 800;
-  margin-bottom: 0.75rem;
-  display: flex;
-  align-items: baseline;
-  letter-spacing: -0.02em;
-}
-
-.seller-badge {
-  color: var(--text-muted);
-  font-size: 0.85rem;
-  margin-bottom: 1.25rem;
-  display: inline-block;
-  background: var(--light-bg);
-  padding: 4px 10px;
-  border-radius: var(--radius-pill);
+.price-tag, .card div[style*="color: #B12704"] {
+  font-size: 1.2rem !important;
+  font-weight: 800 !important;
+  color: var(--text-main) !important; /* Replaced the red with bold black */
+  margin-bottom: 1.5rem !important;
 }
 
 /* =========================================
-   BUTTONS
+   4. SLEEK PILL BUTTONS
    ========================================= */
 .btn-primary {
-  background-color: var(--brand-primary);
+  background-color: var(--action-primary) !important;
+  color: #fff !important;
   border: none;
-  border-radius: var(--radius-pill);
-  padding: 0.85rem 1.5rem;
-  color: white;
-  font-size: 0.95rem;
+  border-radius: var(--radius-pill) !important;
+  padding: 1rem 1.5rem;
+  font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.25);
-  margin-top: auto;
-  transition: var(--transition-fast);
   width: 100%;
-  text-align: center;
+  transition: all 0.2s ease;
 }
 
 .btn-primary:hover {
-  background-color: var(--brand-hover);
-  box-shadow: 0 6px 20px rgba(79, 70, 229, 0.35);
-  transform: translateY(-1px);
+  background-color: var(--action-hover) !important;
+  transform: scale(1.02);
 }
 
 .btn-primary:active {
-  transform: translateY(1px) scale(0.98);
+  transform: scale(0.98);
 }
 
 .btn-secondary {
-  background: white;
-  border: 1px solid var(--border-strong);
-  color: var(--text-strong);
-  padding: 0.6rem 1.2rem;
-  border-radius: var(--radius-sm);
-  font-size: 0.9rem;
+  background-color: var(--bg-muted);
+  color: var(--text-main);
+  border: none;
+  border-radius: var(--radius-pill);
+  padding: 0.8rem 1.5rem;
   font-weight: 600;
   cursor: pointer;
-  transition: var(--transition-fast);
-  box-shadow: var(--shadow-sm);
+  transition: all 0.2s ease;
 }
 
 .btn-secondary:hover {
-  border-color: var(--brand-primary);
-  color: var(--brand-primary);
-  background: #fcfdff;
-}
-
-.btn-secondary:active {
-  transform: scale(0.97);
-}
-
-/* Red "Remove" buttons */
-button[style*="color:red"], button[style*="color: red"] {
-  border: 1px solid var(--danger-bg) !important;
-  color: var(--danger-text) !important;
-  background: var(--danger-bg) !important;
-  border-radius: 6px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: var(--transition-fast);
-}
-
-button[style*="color:red"]:hover {
-  background: #fecaca !important;
-  border-color: #fca5a5 !important;
+  background-color: #e4e4e7;
 }
 
 /* =========================================
-   FORMS & SELLER DASHBOARD
+   5. SELLER DASHBOARD & FORMS (iOS Style)
    ========================================= */
 .form-container {
-  max-width: 800px;
-  margin: 2rem auto;
-  background: var(--surface-white);
-  padding: 3rem;
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
-  border: 1px solid rgba(0,0,0,0.03);
+  max-width: 700px;
+  margin: 0 auto;
+  background: transparent; /* Removed the heavy white box */
+  box-shadow: none;
+  padding: 0;
 }
 
-/* Segmented Control Tabs */
+.form-container h2 {
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: -1px;
+}
+
+/* Segmented Control Tabs (Like iPhone settings) */
 .tab-group {
   display: flex;
-  background: var(--light-bg);
-  padding: 0.5rem;
-  border-radius: var(--radius-md);
-  margin-bottom: 2.5rem;
-  box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+  background: #e4e4e7;
+  padding: 6px;
+  border-radius: var(--radius-pill);
+  margin-bottom: 3rem;
 }
 
 .tab-btn {
   flex: 1;
-  padding: 0.75rem;
+  padding: 0.8rem;
   border: none;
   background: transparent;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-pill);
   font-weight: 600;
-  font-size: 0.95rem;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   cursor: pointer;
-  transition: var(--transition-smooth);
-}
-
-.tab-btn:hover {
-  color: var(--text-strong);
+  transition: all 0.3s ease;
 }
 
 .tab-btn.active {
-  background: var(--surface-white);
-  color: var(--brand-primary);
-  box-shadow: var(--shadow-sm);
+  background: var(--bg-element);
+  color: var(--text-main);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
-/* Inputs */
-.form-group {
-  margin-bottom: 1.5rem;
-}
-
+/* Soft Inputs */
 .form-group label {
   display: block;
   font-size: 0.9rem;
   font-weight: 600;
-  color: var(--text-strong);
+  color: var(--text-main);
   margin-bottom: 0.5rem;
+  margin-left: 0.25rem;
 }
 
 .input-field, select.input-field {
   width: 100%;
-  padding: 0.85rem 1.2rem;
-  background: var(--light-bg);
-  border: 1px solid var(--border-light);
+  padding: 1rem 1.25rem;
+  background: var(--bg-muted);
+  border: 2px solid transparent;
   border-radius: var(--radius-sm);
   font-size: 1rem;
-  color: var(--text-strong);
-  transition: var(--transition-fast);
+  color: var(--text-main);
+  transition: all 0.2s ease;
   box-sizing: border-box;
 }
 
-.input-field:hover {
-  border-color: var(--border-strong);
-}
-
 .input-field:focus {
-  background: var(--surface-white);
-  border-color: var(--brand-primary);
-  box-shadow: 0 0 0 4px var(--brand-light);
+  background: var(--bg-element);
+  border-color: var(--accent-color);
+  box-shadow: 0 4px 15px rgba(99, 102, 241, 0.15);
   outline: none;
 }
 
 textarea.input-field {
-  min-height: 120px;
+  min-height: 140px;
   resize: vertical;
 }
 
-/* Dynamic Sections */
+/* Form Sections */
 .form-section {
-  background: var(--light-bg);
-  border: 1px solid var(--border-light);
+  background: var(--bg-element);
   border-radius: var(--radius-md);
-  padding: 1.5rem;
+  padding: 2rem;
   margin-bottom: 2rem;
+  box-shadow: var(--shadow-float);
 }
 
 .section-title {
-  font-size: 1.1rem;
+  font-size: 1.25rem;
   font-weight: 700;
-  color: var(--text-strong);
-  margin: 0 0 1.25rem 0;
+  margin: 0 0 1.5rem 0;
 }
 
-/* Variant Boxes */
 .variant-box {
-  background: var(--surface-white);
-  border: 1px solid var(--border-light);
-  border-left: 4px solid var(--brand-primary);
+  background: var(--bg-muted);
   border-radius: var(--radius-sm);
-  padding: 1.25rem;
+  padding: 1.5rem;
   margin-bottom: 1rem;
-  box-shadow: var(--shadow-sm);
 }
 
-/* File Upload Area */
+/* File Drop Zone */
 .file-input {
-  background: var(--surface-white);
-  padding: 2.5rem;
-  border: 2px dashed var(--border-strong);
+  background: var(--bg-muted);
+  padding: 3rem;
+  border: 2px dashed #d4d4d8;
   border-radius: var(--radius-md);
   text-align: center;
   cursor: pointer;
-  transition: var(--transition-fast);
-  color: var(--text-muted);
+  transition: all 0.2s ease;
+  font-weight: 600;
+  color: var(--text-secondary);
 }
 
 .file-input:hover {
-  border-color: var(--brand-primary);
-  background: var(--brand-light);
-  color: var(--brand-primary);
+  border-color: var(--accent-color);
+  background: #eef2ff;
+  color: var(--accent-color);
 }
 
 .flex-row {
@@ -425,35 +321,41 @@ textarea.input-field {
   margin-bottom: 1.5rem;
 }
 
+/* Red "Remove" buttons - Make them look like destructive badges */
+button[style*="color:red"], button[style*="color: red"], button[style*="color:#b91c1c"] {
+  border: none !important;
+  color: var(--danger-color) !important;
+  background: #fee2e2 !important;
+  border-radius: var(--radius-pill) !important;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+button[style*="color:red"]:hover, button[style*="color: red"]:hover, button[style*="color:#b91c1c"]:hover {
+  background: #fca5a5 !important;
+  color: white !important;
+}
+
 /* =========================================
-   RESPONSIVE DESIGN
+   6. RESPONSIVE ADJUSTMENTS
    ========================================= */
 @media (max-width: 768px) {
+  .navbar {
+    margin: 0;
+    border-radius: 0;
+    flex-direction: column;
+    padding: 1rem;
+    gap: 1rem;
+  }
   .flex-row {
     flex-direction: column;
     gap: 1rem;
   }
-  .form-container {
-    padding: 1.5rem;
-    margin: 1rem;
+  .tab-group {
+    flex-direction: column;
     border-radius: var(--radius-sm);
   }
-  .container {
-    padding: 1rem;
-  }
-  .navbar {
-    flex-direction: column;
-    align-items: stretch;
-    padding: 1rem;
-    gap: 1rem;
-  }
-  .nav-search-container {
-    margin: 0;
-  }
-  .tab-group {
-    flex-wrap: wrap;
-  }
   .tab-btn {
-    flex: 1 1 40%;
+    border-radius: 8px;
   }
 }
