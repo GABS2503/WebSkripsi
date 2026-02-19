@@ -181,15 +181,6 @@ export default function Marketplace() {
                </button>
              </>
            )}
-           
-           <div className="nav-item">
-             <span>Returns</span>
-             <span>& Orders</span>
-           </div>
-           
-           <div className="nav-item">
-             <span style={{fontSize:'1.5rem'}}>🛒</span>
-           </div>
         </div>
       </nav>
 
