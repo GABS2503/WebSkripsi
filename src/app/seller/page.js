@@ -15,17 +15,14 @@ export default function SellerDashboard() {
   const [myItems, setMyItems] = useState([]);
   const [editingId, setEditingId] = useState(null); 
   
-  // NEW: Store all user products/services for the "Go Live" dropdown
   const [allItemsForLive, setAllItemsForLive] = useState([]); 
 
-  // Listing Form Data (Added selectedItemId)
   const [formData, setFormData] = useState({
     name: '', price: '', category: '', description: '', stock: '', 
     title: '', streamUrl: '', 
-    selectedItemId: '' // <--- NEW: Selected Product ID for Livestream
+    selectedItemId: '' 
   });
   
-  // Payment Settings Data
   const [settingsData, setSettingsData] = useState({
     midtransServerKey: '',
     midtransClientKey: ''
@@ -37,7 +34,6 @@ export default function SellerDashboard() {
   const [files, setFiles] = useState([]); 
   const [previews, setPreviews] = useState([]);
 
-  // Temp variant state
   const [newVariantName, setNewVariantName] = useState('');
   const [newVariantOption, setNewVariantOption] = useState('');
 
@@ -45,7 +41,7 @@ export default function SellerDashboard() {
   const SERVICE_CATS = ["Electronics Repair", "House Cleaning", "Massage/Spa", "Tutoring", "Graphic Design", "Laundry", "Catering", "Consulting", "Transport"];
   const currentCategories = activeTab === 'product' ? PRODUCT_CATS : SERVICE_CATS;
 
-  // --- 1. FETCH ITEMS (Combined Logic) ---
+  // --- 1. FETCH ITEMS ---
   const fetchMyItems = useCallback(async () => {
     if (activeTab === 'settings') return;
     
@@ -57,14 +53,12 @@ export default function SellerDashboard() {
     const endpoint = activeTab === 'product' ? 'products' : activeTab === 'service' ? 'services' : 'livestreams';
     
     try {
-      // A. Fetch current tab items (for the list at the bottom)
       const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/${endpoint}?filters[seller][id][$eq]=${user.id}&populate=*&sort=createdAt:desc`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
       const normalizedItems = res.data.data.map(item => {
           const attrs = item.attributes || item;
-          // CRITICAL FIX: Ensure documentId is grabbed if it exists
           return { 
             ...attrs,
             _id: item.id, 
@@ -74,7 +68,6 @@ export default function SellerDashboard() {
       });
       setMyItems(normalizedItems);
 
-      // B. NEW: If in Livestream tab, fetch Products & Services for the dropdown
       if (activeTab === 'livestream') {
         const [prodRes, servRes] = await Promise.all([
            axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/products?filters[seller][id][$eq]=${user.id}`, { headers: { Authorization: `Bearer ${token}` } }),
@@ -138,7 +131,6 @@ export default function SellerDashboard() {
     setNewVariantOption('');
   };
 
-  // --- 2. HANDLE EDIT CLICK ---
   const handleEdit = (item) => {
     const updateId = item._documentId || item.id;
     setEditingId(updateId); 
@@ -149,7 +141,7 @@ export default function SellerDashboard() {
       setFormData({
         title: item.title,
         streamUrl: item.streamUrl,
-        selectedItemId: '' // Reset selection when editing (complex to pre-fill without deep populate)
+        selectedItemId: '' 
       });
     } else {
       setFormData({
@@ -177,7 +169,6 @@ export default function SellerDashboard() {
     }
   };
 
-  // --- 3. HANDLE DELETE CLICK ---
   const handleDelete = async (id) => {
     if(!confirm("Are you sure you want to delete this listing?")) return;
     
@@ -197,7 +188,6 @@ export default function SellerDashboard() {
     }
   };
 
-  // --- HELPER FUNCTIONS ---
   const addVariantType = () => { if (!newVariantName.trim()) return; setVariants([...variants, { name: newVariantName, options: [] }]); setNewVariantName(''); };
   const addVariantOption = (variantIndex) => { if (!newVariantOption.trim()) return; const updatedVariants = [...variants]; updatedVariants[variantIndex].options.push({ name: newVariantOption, file: null, previewUrl: null, image: null }); setVariants(updatedVariants); setNewVariantOption(''); };
   const handleVariantImageUpload = (e, variantIndex, optionIndex) => { const file = e.target.files[0]; if (!file) return; const updatedVariants = [...variants]; updatedVariants[variantIndex].options[optionIndex].file = file; updatedVariants[variantIndex].options[optionIndex].previewUrl = URL.createObjectURL(file); setVariants(updatedVariants); };
@@ -225,7 +215,6 @@ export default function SellerDashboard() {
     const token = localStorage.getItem('token'); const user = JSON.parse(localStorage.getItem('user'));
 
     try {
-      // 1. UPLOAD MAIN GALLERY FILES
       let mediaIds = []; 
       if (files.length > 0) {
         const uploadData = new FormData();
@@ -234,7 +223,6 @@ export default function SellerDashboard() {
         mediaIds = uploadRes.data.map(file => file.id);
       }
 
-      // 2. PROCESS VARIANTS
       const processedVariants = await Promise.all(variants.map(async (variant) => {
         const processedOptions = await Promise.all(variant.options.map(async (option) => {
           let imageData = option.image; 
@@ -253,7 +241,6 @@ export default function SellerDashboard() {
 
       if (activeTab === 'livestream') {
         payloadData = { title: formData.title, streamUrl: formData.streamUrl, isLive: true, seller: user.id };
-        // --- NEW: LINK PRODUCT/SERVICE ---
         if (formData.selectedItemId) {
           const selectedItem = allItemsForLive.find(i => i.id === formData.selectedItemId);
           if (selectedItem?.type === 'product') payloadData.relatedProduct = selectedItem.id;
@@ -265,7 +252,6 @@ export default function SellerDashboard() {
         if (mediaIds.length > 0) { payloadData.media = mediaIds; }
       }
 
-      // --- 4. CREATE OR UPDATE ---
       const url = `${process.env.NEXT_PUBLIC_API_URL}/api/${endpoint}${editingId ? `/${editingId}` : ''}`;
       console.log(`Submitting to: ${url}`); 
 
@@ -297,6 +283,12 @@ export default function SellerDashboard() {
       <nav className="navbar" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
         <h1 style={{ margin: 0 }}>Seller Dashboard</h1>
         <div className="nav-links" style={{display:'flex', gap:'1.5rem', alignItems:'center'}}>
+           
+           {/* --- NEW BUTTON: INCOMING ORDERS --- */}
+           <Link href="/seller/orders" style={{color:'white', textDecoration:'none', fontWeight:'bold', display:'flex', alignItems:'center', gap:'5px', background:'#e77600', padding:'5px 15px', borderRadius:'20px'}}>
+             <span>📦</span> Orders
+           </Link>
+
            <Link href="/chat" style={{color:'white', textDecoration:'none', fontWeight:'bold', display:'flex', alignItems:'center', gap:'5px', background:'rgba(255,255,255,0.1)', padding:'5px 10px', borderRadius:'4px'}}>
              <span>💬</span> Messages
            </Link>
@@ -318,7 +310,6 @@ export default function SellerDashboard() {
           </div>
 
           {activeTab === 'settings' ? (
-            /* --- SETTINGS TAB --- */
             <div style={{animation:'fadeIn 0.3s'}}>
               <h2 style={{textAlign:'center'}}>Payment Configuration</h2>
               <form onSubmit={handleSaveSettings}>
@@ -334,7 +325,6 @@ export default function SellerDashboard() {
               </form>
             </div>
           ) : (
-            /* --- LISTING FORM --- */
             <form onSubmit={handleSubmit}>
               {editingId && (
                 <div style={{background: '#fff7ed', border: '1px solid #fed7aa', color: '#9a3412', padding: '10px', borderRadius: '6px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
@@ -348,7 +338,6 @@ export default function SellerDashboard() {
                    <div className="form-group"><label>Stream Title</label><input className="input-field" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} required /></div>
                    <div className="form-group"><label>YouTube Embed URL</label><input className="input-field" value={formData.streamUrl} onChange={e => setFormData({...formData, streamUrl: e.target.value})} required /></div>
                    
-                   {/* --- NEW DROPDOWN: LINK PRODUCT --- */}
                    <div className="form-group" style={{marginTop:'1rem', padding:'1rem', background:'#f0fdf4', border:'1px solid #bbf7d0', borderRadius:'8px'}}>
                       <label style={{color:'#166534'}}>🛒 Feature a Product (Optional)</label>
                       <select 
@@ -457,7 +446,7 @@ export default function SellerDashboard() {
                     )}
                   </div>
 
-                  {/* --- MAIN IMAGE UPLOAD (Multiple + Preview) --- */}
+                  {/* --- MAIN IMAGE UPLOAD --- */}
                   <div className="form-group">
                     <label>Upload Main Media (Select Multiple)</label>
                     <input 
@@ -469,7 +458,6 @@ export default function SellerDashboard() {
                       required={!editingId && files.length === 0} 
                     />
                     
-                    {/* Preview Grid */}
                     <div style={{display:'flex', gap:'10px', marginTop:'10px', flexWrap:'wrap'}}>
                       {previews.map((src, index) => (
                         <div key={index} style={{position:'relative', width:'80px', height:'80px', border:'1px solid #ddd', borderRadius:'8px', overflow:'hidden'}}>
