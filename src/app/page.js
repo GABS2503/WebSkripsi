@@ -198,7 +198,7 @@ export default function Marketplace() {
           <input 
             type="text" 
             className="nav-search-input" 
-            placeholder="Search MSME (Try typing 67)..." 
+            placeholder="Search A Product or Service" 
             onChange={(e) => setSearch(e.target.value)}
           />
           <button className="nav-search-btn">🔍</button>
