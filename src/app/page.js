@@ -12,9 +12,7 @@ const StoreMap = dynamic(() => import('@/components/StoreMap'), { ssr: false });
 // --- SMART IMAGE HELPER ---
 const getImageUrl = (url) => {
   if (!url) return null;
-  if (url.startsWith('http') || url.startsWith('//')) {
-    return url;
-  }
+  if (url.startsWith('http') || url.startsWith('//')) return url;
   const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:1337';
   return `${baseUrl}${url}`;
 };
@@ -23,9 +21,12 @@ export default function Marketplace() {
   const router = useRouter();
   const [items, setItems] = useState([]);
   const [streams, setStreams] = useState([]);
-  const [sellersMapLocations, setSellersMapLocations] = useState([]); // Map locations state
+  const [sellersMapLocations, setSellersMapLocations] = useState([]); 
   const [search, setSearch] = useState('');
   const [user, setUser] = useState(null);
+
+  // --- STATE FOR RANDOM MOVING IMAGES ---
+  const [featuredItems, setFeaturedItems] = useState([]);
 
   // --- FILTERS & SORTING STATE ---
   const [typeFilter, setTypeFilter] = useState('all'); 
@@ -79,7 +80,7 @@ export default function Marketplace() {
         documentId: item.documentId || item.id,
         ...data,
         type: type,
-        seller: sellerData, // Attached seller data for the map
+        seller: sellerData,
         sellerName: shopName,
         mediaUrl: mediaUrl, 
         isVideo: mimeType.startsWith('video/'),
@@ -103,6 +104,13 @@ export default function Marketplace() {
         const services = normalizeData(s.data.data, 'service');
         const allItems = [...products, ...services];
         setItems(allItems);
+
+        // --- EXTRACT RANDOM ITEMS FOR THE MOVING MARQUEE ---
+        // 1. Only get items that have a valid image (no videos for the marquee)
+        const itemsWithImages = allItems.filter(i => i.mediaUrl && !i.isVideo);
+        // 2. Shuffle them randomly and pick the first 8
+        const shuffled = itemsWithImages.sort(() => 0.5 - Math.random()).slice(0, 8);
+        setFeaturedItems(shuffled);
 
         // --- EXTRACT SELLER MAP LOCATIONS ---
         const uniqueSellersMap = new Map();
@@ -225,6 +233,33 @@ export default function Marketplace() {
 
       <main className="container">
         
+        {/* ==============================================
+            THE NEW ANIMATED MARQUEE CAROUSEL 
+            ============================================== */}
+        {featuredItems.length > 0 && (
+          <div style={{ marginBottom: '3rem' }}>
+            <h2 style={{ fontSize: '1.8rem', color: '#0f172a', marginBottom: '0.5rem' }}>Discover Random Finds</h2>
+            <div className="marquee-container">
+              <div className="marquee-content">
+                {/* We map the items TWICE so the loop looks perfectly endless */}
+                {[...featuredItems, ...featuredItems].map((item, idx) => (
+                  <Link key={idx} href={`/item/${item.documentId}?type=${item.type}`} style={{ textDecoration: 'none' }}>
+                    <div className="marquee-item">
+                      <div className="marquee-img-wrap">
+                        <img src={item.mediaUrl} alt={item.name} loading="lazy" />
+                      </div>
+                      <div className="marquee-text-wrap">
+                        <div className="marquee-title">{item.name}</div>
+                        <div className="marquee-price">Rp {item.price?.toLocaleString()}</div>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* --- GLOBAL STORE MAP --- */}
         <div style={{marginBottom:'3rem'}}>
             <h2 style={{fontSize:'1.8rem', color:'#0f172a', marginBottom:'1rem'}}>Explore Local Stores</h2>
@@ -234,7 +269,7 @@ export default function Marketplace() {
         {/* --- LIVE SECTION --- */}
         {streams.length > 0 && (
           <div style={{ background:'white', padding:'1.5rem', marginBottom:'3rem', borderRadius:'16px', boxShadow:'var(--shadow-sm)', border: '1px solid #e2e8f0' }}>
-              <h3 style={{margin:'0 0 1.5rem 0', color:'#e11d48'}}>🔴 Live Stream | MSME Edition</h3>
+              <h3 style={{margin:'0 0 1.5rem 0', color:'#e11d48'}}>🔴 Amazon Live | MSME Edition</h3>
               <div style={{display:'flex', gap:'1.5rem', overflowX:'auto', paddingBottom: '1rem'}}>
                 {streams.map((stream) => (
                   <Link key={stream.id} href={`/live/${stream.documentId}`} style={{textDecoration:'none', color:'inherit', minWidth:'280px'}}>
