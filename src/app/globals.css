@@ -393,3 +393,35 @@ body.a11y-highlight-links a, body.a11y-highlight-links button { outline: 3px sol
   .flex-row { flex-direction: column; gap: 1rem; }
   .tab-group { flex-direction: column; }
 }
+
+/* =========================================
+   10. EASTER EGG (67 MEME)
+   ========================================= */
+@keyframes bob-left {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-25px) rotate(-4deg); }
+}
+
+@keyframes bob-right {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(25px) rotate(4deg); }
+}
+
+/* Make odd items go UP and left */
+.meme-67-active .card:nth-child(odd),
+.meme-67-active .marquee-item:nth-child(odd) {
+  animation: bob-left 0.4s infinite ease-in-out;
+  border-color: #ef4444;
+}
+
+/* Make even items go DOWN and right */
+.meme-67-active .card:nth-child(even),
+.meme-67-active .marquee-item:nth-child(even) {
+  animation: bob-right 0.4s infinite ease-in-out;
+  border-color: #3b82f6;
+}
+
+/* Make the map join the party */
+.meme-67-active .leaflet-container {
+  animation: bob-left 0.8s infinite ease-in-out;
+}
