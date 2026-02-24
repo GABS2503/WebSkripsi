@@ -1,5 +1,6 @@
 import './globals.css';
-import AccessibilityToolbar from '../components/AccessibilityToolbar'; 
+import AccessibilityToolbar from '../components/AccessibilityToolbar';
+import AccessibilityWidget from '@/components/AccessibilityWidget';
 import { CartProvider } from '@/context/CartContext'; // Import CartProvider
 
 export const metadata = {
@@ -14,6 +15,7 @@ export default function RootLayout({ children }) {
         <CartProvider>
           {children}
           <AccessibilityToolbar />
+          <AccessibilityWidget />
         </CartProvider>
       </body>
     </html>
