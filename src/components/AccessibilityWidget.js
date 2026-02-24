@@ -45,11 +45,6 @@ export default function AccessibilityWidget() {
     };
 
     // Remove highlight when mouse leaves
-    const handleMouseOut = (e) => {
-      e.target.classList.remove('a11y-reading-target');
-    };
-
-    // Read text out loud on click
     const handleClick = (e) => {
       // If clicking inside the widget menu, let it happen normally
       if (e.target.closest('#a11y-widget')) return; 
@@ -63,6 +58,10 @@ export default function AccessibilityWidget() {
       
       if (textToRead) {
         const utterance = new SpeechSynthesisUtterance(textToRead);
+        
+        // --- NEW LINE: Set language to Indonesian ---
+        utterance.lang = 'id-ID'; 
+        
         window.speechSynthesis.speak(utterance);
       }
     };
