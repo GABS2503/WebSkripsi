@@ -13,18 +13,23 @@ const icon = L.icon({
 });
 
 export default function StoreMap({ sellers }) {
-  if (!sellers || sellers.length === 0) {
-    return <div style={{padding:'2rem', textAlign:'center', background:'#f8fafc', borderRadius:'12px', border:'1px solid #e2e8f0'}}>No stores have pinned their locations yet.</div>;
-  }
-
-  // Center map on the first seller's location
-  const center = [sellers[0].lat, sellers[0].lng];
+  // --- SET DEFAULT CENTER TO MANADO CITY ---
+  const manadoCenter = [1.4822, 124.8489];
 
   return (
     <div style={{ height: '400px', width: '100%', borderRadius: '16px', overflow: 'hidden', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
-      <MapContainer center={center} zoom={11} style={{ height: '100%', width: '100%' }}>
-        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap' />
-        {sellers.map((s) => (
+      <MapContainer 
+        center={manadoCenter} 
+        zoom={13} // Zoomed in perfectly for a city view
+        style={{ height: '100%', width: '100%' }}
+      >
+        <TileLayer 
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" 
+            attribution='&copy; OpenStreetMap' 
+        />
+        
+        {/* Render pins only if there are sellers */}
+        {sellers && sellers.length > 0 && sellers.map((s) => (
            <Marker key={s.id} position={[s.lat, s.lng]} icon={icon}>
              <Popup>
                <div style={{textAlign:'center'}}>
