@@ -106,9 +106,7 @@ export default function Marketplace() {
         setItems(allItems);
 
         // --- EXTRACT RANDOM ITEMS FOR THE MOVING MARQUEE ---
-        // 1. Only get items that have a valid image (no videos for the marquee)
         const itemsWithImages = allItems.filter(i => i.mediaUrl && !i.isVideo);
-        // 2. Shuffle them randomly and pick the first 8
         const shuffled = itemsWithImages.sort(() => 0.5 - Math.random()).slice(0, 8);
         setFeaturedItems(shuffled);
 
@@ -179,11 +177,15 @@ export default function Marketplace() {
       processedItems.sort((a, b) => b.price - a.price);
   }
 
-  // Generate available categories dynamically for the filter dropdown
   const availableCategories = Array.from(new Set(items.map(i => i.category).filter(Boolean)));
 
+  // -------------------------------------------------------------
+  // EASTER EGG ACTIVATOR
+  // -------------------------------------------------------------
+  const isMemeActive = search.trim() === '67';
+
   return (
-    <div>
+    <div className={isMemeActive ? 'meme-67-active' : ''}>
       <Script src="https://app.sandbox.midtrans.com/snap/snap.js" data-client-key={process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY} strategy="lazyOnload"/>
       
       {/* --- NAVBAR --- */}
@@ -196,7 +198,7 @@ export default function Marketplace() {
           <input 
             type="text" 
             className="nav-search-input" 
-            placeholder="Search MSME..." 
+            placeholder="Search MSME (Try typing 67)..." 
             onChange={(e) => setSearch(e.target.value)}
           />
           <button className="nav-search-btn">🔍</button>
