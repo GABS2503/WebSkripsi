@@ -8,10 +8,8 @@ import ProductReviews from '@/components/ProductReviews';
 import { useCart } from '@/context/CartContext';
 import dynamic from 'next/dynamic';
 
-// --- DYNAMIC IMPORT FOR MAP ---
 const MapPicker = dynamic(() => import('@/components/MapPicker'), { ssr: false });
 
-// --- SMART IMAGE HELPER ---
 const getImageUrl = (url) => {
   if (!url) return '/placeholder.png';
   if (url.startsWith('http') || url.startsWith('//')) {
@@ -36,8 +34,10 @@ export default function ItemDetails() {
   const [quantity, setQuantity] = useState(1);
   const [selectedVariants, setSelectedVariants] = useState({}); 
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  
+  // --- NEW: STATE FOR VARIANT IMAGE SWAPPING ---
+  const [activeVariantImage, setActiveVariantImage] = useState(null);
 
-  // --- OPTIONS & LOCATION STATE ---
   const [deliveryType, setDeliveryType] = useState(''); 
   const [customerInfo, setCustomerInfo] = useState({ name: '', address: '', lat: null, lng: null });
 
@@ -60,56 +60,39 @@ export default function ItemDetails() {
     fetchData();
   }, [id, type]);
 
-  const handleVariantSelect = (variantName, optionName) => {
+  // --- UPDATED: HANDLE VARIANT CLICK (Swaps Image) ---
+  const handleVariantSelect = (variantName, optionName, optionImage) => {
     setSelectedVariants(prev => ({ ...prev, [variantName]: optionName }));
+    
+    // If the seller attached an image to this variant, show it!
+    if (optionImage && optionImage.url) {
+      setActiveVariantImage(getImageUrl(optionImage.url));
+    }
+  };
+
+  // --- UPDATED: GALLERY CLICK (Clears Variant Image) ---
+  const handleGalleryClick = (index) => {
+    setActiveImageIndex(index);
+    setActiveVariantImage(null); // Revert to standard gallery
   };
 
   const handleChat = async () => {
     const userStr = localStorage.getItem('user');
-    if (!userStr) {
-      alert("Please login to chat.");
-      router.push('/login');
-      return;
-    }
+    if (!userStr) { alert("Please login to chat."); router.push('/login'); return; }
     const currentUser = JSON.parse(userStr);
     const token = localStorage.getItem('token');
-
-    let sellerId = null;
-    let itemName = "Item";
+    let sellerId = null; let itemName = "Item";
     const extractId = (obj) => obj?.data?.id || obj?.id;
-
     if (item) {
-      if (item.seller) {
-        sellerId = extractId(item.seller);
-        itemName = item.name;
-      }
-      else if (item.attributes?.seller) {
-        sellerId = extractId(item.attributes.seller);
-        itemName = item.attributes.name;
-      }
+      if (item.seller) { sellerId = extractId(item.seller); itemName = item.name; }
+      else if (item.attributes?.seller) { sellerId = extractId(item.attributes.seller); itemName = item.attributes.name; }
     }
-
-    if (!sellerId) {
-      alert("Error: Could not read Seller ID.");
-      return;
-    }
-
-    if (String(currentUser.id) === String(sellerId)) {
-      alert("This is your own item!");
-      return;
-    }
-
+    if (!sellerId) return;
+    if (String(currentUser.id) === String(sellerId)) { alert("This is your own item!"); return; }
     try {
-      const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/conversations`, {
-        data: { users: [currentUser.id, sellerId], itemTitle: itemName }
-      }, { headers: { Authorization: `Bearer ${token}` } });
-
-      const convId = res.data.data.documentId || res.data.data.id;
-      router.push(`/chat?id=${convId}`);
-    } catch (err) {
-      console.error(err);
-      alert("Could not start chat.");
-    }
+      const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/conversations`, { data: { users: [currentUser.id, sellerId], itemTitle: itemName } }, { headers: { Authorization: `Bearer ${token}` } });
+      router.push(`/chat?id=${res.data.data.documentId || res.data.data.id}`);
+    } catch (err) { alert("Could not start chat."); }
   };
 
   const handleAddToCart = () => {
@@ -118,53 +101,25 @@ export default function ItemDetails() {
 
     if (variantData.length > 0) {
       const missing = variantData.find(v => !selectedVariants[v.name]);
-      if (missing) {
-        alert(`Please select a ${missing.name}`);
-        return;
-      }
+      if (missing) { alert(`Please select a ${missing.name}`); return; }
     }
-
-    if (!deliveryType) {
-      alert("Please select a delivery/service option.");
-      return;
-    }
-    if (!customerInfo.name) {
-      alert("Please enter your name.");
-      return;
-    }
-    
+    if (!deliveryType) { alert("Please select a delivery/service option."); return; }
+    if (!customerInfo.name) { alert("Please enter your name."); return; }
     if ((deliveryType === 'shipping' || deliveryType === 'home_service')) {
-        if (!customerInfo.lat || !customerInfo.lng) {
-            alert("Please pin your location on the map.");
-            return;
-        }
-        if (!customerInfo.address) {
-            alert("Please provide address details (e.g. Unit number).");
-            return;
-        }
+        if (!customerInfo.lat || !customerInfo.lng) { alert("Please pin your location on the map."); return; }
+        if (!customerInfo.address) { alert("Please provide address details."); return; }
     }
 
     const data = item.attributes || item;
     const price = data.price;
     const media = data.media?.data || data.media || [];
-    const imageUrl = getImageUrl(media[0]?.attributes?.url || media[0]?.url);
+    
+    // Check if the currently selected variant has a specific image, otherwise use default
+    const finalImageUrl = activeVariantImage || getImageUrl(media[0]?.attributes?.url || media[0]?.url);
     const seller = data.seller?.data?.attributes || data.seller;
 
-    const cartPayload = {
-        id: item.documentId || item.id,
-        name: name,
-        price: price,
-        image: imageUrl,
-        seller: seller, 
-        type: type,
-        quantity: quantity
-    };
-
-    const options = {
-        variants: selectedVariants,
-        deliveryType: deliveryType
-    };
-
+    const cartPayload = { id: item.documentId || item.id, name: name, price: price, image: finalImageUrl, seller: seller, type: type, quantity: quantity };
+    const options = { variants: selectedVariants, deliveryType: deliveryType };
     addToCart(cartPayload, options, customerInfo);
   };
 
@@ -187,16 +142,19 @@ export default function ItemDetails() {
     return items.map(item => {
       const finalData = item?.attributes || item;
       if (!finalData?.url) return null;
-      return {
-        id: item.id,
-        url: getImageUrl(finalData.url), 
-        isVideo: finalData.mime?.startsWith('video/')
-      };
+      return { id: item.id, url: getImageUrl(finalData.url), isVideo: finalData.mime?.startsWith('video/') };
     }).filter(Boolean);
   };
 
   const mediaList = getMediaList(data.media);
-  const activeMedia = mediaList[activeImageIndex] || mediaList[0] || null;
+  
+  // --- CHOOSE WHICH MEDIA TO DISPLAY ---
+  let displayMedia = null;
+  if (activeVariantImage) {
+      displayMedia = { url: activeVariantImage, isVideo: false };
+  } else {
+      displayMedia = mediaList[activeImageIndex] || mediaList[0] || null;
+  }
 
   return (
     <div style={{ background: '#f3f4f6', minHeight: '100vh', color: '#000' }}>
@@ -212,12 +170,12 @@ export default function ItemDetails() {
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3rem', background: 'white', padding: '2.5rem', borderRadius: '12px', boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }}>
           
           <div style={{ flex: '1 1 450px' }}>
-            <div style={{ width: '100%', height: '450px', background: '#f9fafb', borderRadius: '12px', border: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginBottom: '1rem' }}>
-              {activeMedia ? (
-                 activeMedia.isVideo ? (
-                   <video controls src={activeMedia.url} style={{maxWidth:'100%', maxHeight:'100%'}} />
+            <div style={{ width: '100%', height: '450px', background: '#f9fafb', borderRadius: '12px', border: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginBottom: '1rem', transition: 'all 0.3s ease' }}>
+              {displayMedia ? (
+                 displayMedia.isVideo ? (
+                   <video controls src={displayMedia.url} style={{maxWidth:'100%', maxHeight:'100%'}} />
                  ) : (
-                   <img src={activeMedia.url} alt={data.name} style={{maxWidth:'100%', maxHeight:'100%', objectFit:'contain'}} />
+                   <img src={displayMedia.url} alt={data.name} style={{maxWidth:'100%', maxHeight:'100%', objectFit:'contain', transition: 'all 0.3s ease'}} />
                  )
               ) : (
                  <div style={{width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center', color:'#000', flexDirection:'column'}}>
@@ -230,7 +188,7 @@ export default function ItemDetails() {
             {mediaList.length > 1 && (
               <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
                 {mediaList.map((media, index) => (
-                  <div key={index} onClick={() => setActiveImageIndex(index)} style={{width: '70px', height: '70px', borderRadius: '6px', border: activeImageIndex === index ? '3px solid #2563eb' : '1px solid #ddd', cursor: 'pointer', overflow: 'hidden', flexShrink: 0}}>
+                  <div key={index} onClick={() => handleGalleryClick(index)} style={{width: '70px', height: '70px', borderRadius: '6px', border: (!activeVariantImage && activeImageIndex === index) ? '3px solid #2563eb' : '1px solid #ddd', cursor: 'pointer', overflow: 'hidden', flexShrink: 0}}>
                     {media.isVideo ? <div style={{width:'100%', height:'100%', background:'#000', color:'white', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.8rem'}}>VID</div> : <img src={media.url} alt="thumb" style={{width:'100%', height:'100%', objectFit:'cover'}} />}
                   </div>
                 ))}
@@ -238,7 +196,6 @@ export default function ItemDetails() {
             )}
           </div>
 
-          {/* --- TEXT CONTENT RIGHT PANEL --- */}
           <div style={{ flex: '1 1 450px' }}>
             <h1 style={{ marginTop: 0, color: '#000', fontSize: '2.2rem', fontWeight: '800' }}>{data.name}</h1>
             <p style={{ color: '#000', fontSize: '1.1rem', marginBottom: '1.5rem' }}>
@@ -271,6 +228,7 @@ export default function ItemDetails() {
               </div>
             )}
 
+            {/* --- RENDER VARIANTS WITH CLICK EVENT --- */}
             {variants.map((variant, i) => (
               <div key={i} style={{ marginBottom: '1.5rem' }}>
                 <div style={{ fontWeight: 'bold', marginBottom: '0.8rem', fontSize: '1.1rem', color: '#000' }}>
@@ -283,7 +241,11 @@ export default function ItemDetails() {
                     const image = isObject ? option.image : null;
                     const isSelected = selectedVariants[variant.name] === name;
                     return (
-                      <button key={idx} onClick={() => handleVariantSelect(variant.name, name)} style={{padding: '0.6rem 1.2rem', fontSize: '1.05rem', color: '#000', border: isSelected ? '2px solid #2563eb' : '1px solid #d1d5db', background: isSelected ? '#eff6ff' : 'white', borderRadius: '6px', cursor: 'pointer', fontWeight: isSelected ? 'bold' : 'normal', display: 'flex', alignItems: 'center', gap: '8px'}}>
+                      <button 
+                        key={idx} 
+                        onClick={() => handleVariantSelect(variant.name, name, image)} 
+                        style={{padding: '0.6rem 1.2rem', fontSize: '1.05rem', color: '#000', border: isSelected ? '2px solid #2563eb' : '1px solid #d1d5db', background: isSelected ? '#eff6ff' : 'white', borderRadius: '6px', cursor: 'pointer', fontWeight: isSelected ? 'bold' : 'normal', display: 'flex', alignItems: 'center', gap: '8px', transition: 'all 0.2s'}}
+                      >
                         {image && <img src={getImageUrl(image.url)} alt={name} style={{width:'28px', height:'28px', objectFit:'cover', borderRadius:'4px', border:'1px solid #eee'}} />}
                         {name}
                       </button>
@@ -315,58 +277,31 @@ export default function ItemDetails() {
                     <div style={{display:'flex', gap:'15px', flexDirection:'column'}}>
                         {type === 'product' ? (
                             <>
-                                <label style={{cursor:'pointer', display:'flex', gap:'10px', alignItems:'center', fontSize: '1.1rem', color: '#000'}}>
-                                    <input type="radio" name="del_opt" value="pickup" onChange={(e)=>setDeliveryType(e.target.value)} style={{width: '20px', height: '20px'}} /> 
-                                    🏪 Buy in Place (Pickup)
-                                </label>
-                                <label style={{cursor:'pointer', display:'flex', gap:'10px', alignItems:'center', fontSize: '1.1rem', color: '#000'}}>
-                                    <input type="radio" name="del_opt" value="shipping" onChange={(e)=>setDeliveryType(e.target.value)} style={{width: '20px', height: '20px'}} /> 
-                                    🚚 Take Away (Delivery)
-                                </label>
+                                <label style={{cursor:'pointer', display:'flex', gap:'10px', alignItems:'center', fontSize: '1.1rem', color: '#000'}}><input type="radio" name="del_opt" value="pickup" onChange={(e)=>setDeliveryType(e.target.value)} style={{width: '20px', height: '20px'}} /> 🏪 Buy in Place (Pickup)</label>
+                                <label style={{cursor:'pointer', display:'flex', gap:'10px', alignItems:'center', fontSize: '1.1rem', color: '#000'}}><input type="radio" name="del_opt" value="shipping" onChange={(e)=>setDeliveryType(e.target.value)} style={{width: '20px', height: '20px'}} /> 🚚 Take Away (Delivery)</label>
                             </>
                         ) : (
                             <>
-                                <label style={{cursor:'pointer', display:'flex', gap:'10px', alignItems:'center', fontSize: '1.1rem', color: '#000'}}>
-                                    <input type="radio" name="del_opt" value="onsite" onChange={(e)=>setDeliveryType(e.target.value)} style={{width: '20px', height: '20px'}} /> 
-                                    🚶 I go to Seller
-                                </label>
-                                <label style={{cursor:'pointer', display:'flex', gap:'10px', alignItems:'center', fontSize: '1.1rem', color: '#000'}}>
-                                    <input type="radio" name="del_opt" value="home_service" onChange={(e)=>setDeliveryType(e.target.value)} style={{width: '20px', height: '20px'}} /> 
-                                    🏠 Seller comes to Me
-                                </label>
+                                <label style={{cursor:'pointer', display:'flex', gap:'10px', alignItems:'center', fontSize: '1.1rem', color: '#000'}}><input type="radio" name="del_opt" value="onsite" onChange={(e)=>setDeliveryType(e.target.value)} style={{width: '20px', height: '20px'}} /> 🚶 I go to Seller</label>
+                                <label style={{cursor:'pointer', display:'flex', gap:'10px', alignItems:'center', fontSize: '1.1rem', color: '#000'}}><input type="radio" name="del_opt" value="home_service" onChange={(e)=>setDeliveryType(e.target.value)} style={{width: '20px', height: '20px'}} /> 🏠 Seller comes to Me</label>
                             </>
                         )}
                     </div>
                   </div>
 
-                  {/* --- CUSTOMER INFO FORM --- */}
                   {deliveryType && (
                     <div style={{ background:'white', padding:'20px', borderRadius:'8px', marginBottom:'2rem', border:'1px solid #d1d5db' }}>
                         <div style={{marginBottom:'15px'}}>
                             <label style={{fontSize:'1.1rem', fontWeight:'bold', color: '#000', display: 'block', marginBottom: '8px'}}>Your Name</label>
-                            <input 
-                                type="text" 
-                                placeholder="Enter your full name"
-                                style={{width:'100%', padding:'12px', border:'1px solid #9ca3af', borderRadius:'6px', fontSize: '1.05rem', color: '#000'}}
-                                value={customerInfo.name}
-                                onChange={(e) => setCustomerInfo({...customerInfo, name: e.target.value})}
-                            />
+                            <input type="text" placeholder="Enter your full name" style={{width:'100%', padding:'12px', border:'1px solid #9ca3af', borderRadius:'6px', fontSize: '1.05rem', color: '#000'}} value={customerInfo.name} onChange={(e) => setCustomerInfo({...customerInfo, name: e.target.value})} />
                         </div>
 
                         {(deliveryType === 'shipping' || deliveryType === 'home_service') && (
                             <div>
-                                <label style={{fontSize:'1.1rem', fontWeight:'bold', display:'block', marginBottom:'8px', color: '#000'}}>
-                                    Pin Location
-                                </label>
+                                <label style={{fontSize:'1.1rem', fontWeight:'bold', display:'block', marginBottom:'8px', color: '#000'}}>Pin Location</label>
                                 <MapPicker onLocationSelect={(loc) => setCustomerInfo({ ...customerInfo, lat: loc.lat, lng: loc.lng })} />
                                 <label style={{fontSize:'1.1rem', fontWeight:'bold', display:'block', marginTop:'15px', marginBottom: '8px', color: '#000'}}>Detail Address</label>
-                                <textarea 
-                                    placeholder="e.g. White fence, Unit 4B"
-                                    style={{width:'100%', padding:'12px', border:'1px solid #9ca3af', borderRadius:'6px', fontSize: '1.05rem', color: '#000'}}
-                                    rows={3}
-                                    value={customerInfo.address}
-                                    onChange={(e) => setCustomerInfo({...customerInfo, address: e.target.value})}
-                                />
+                                <textarea placeholder="e.g. White fence, Unit 4B" style={{width:'100%', padding:'12px', border:'1px solid #9ca3af', borderRadius:'6px', fontSize: '1.05rem', color: '#000'}} rows={3} value={customerInfo.address} onChange={(e) => setCustomerInfo({...customerInfo, address: e.target.value})} />
                             </div>
                         )}
                     </div>
@@ -386,13 +321,7 @@ export default function ItemDetails() {
         <ProductReviews itemId={item.documentId || item.id} itemType={type} />
       </main>
 
-      {sellerClientKey && (
-        <Script 
-          src="https://app.sandbox.midtrans.com/snap/snap.js"
-          data-client-key={sellerClientKey}
-          strategy="lazyOnload" 
-        />
-      )}
+      {sellerClientKey && <Script src="https://app.sandbox.midtrans.com/snap/snap.js" data-client-key={sellerClientKey} strategy="lazyOnload" />}
     </div>
   );
 }
