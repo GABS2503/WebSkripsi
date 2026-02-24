@@ -153,12 +153,25 @@ export default function SellerDashboard() {
 
   return (
     <div>
+      {/* NAVBAR */}
       <nav className="navbar" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-        <h1 style={{ margin: 0 }}>Seller Dashboard</h1>
+        <h1 style={{ margin: 0, color: '#2563eb' }}>Seller Dashboard</h1>
         <div className="nav-links" style={{display:'flex', gap:'1.5rem', alignItems:'center'}}>
-           <Link href="/seller/orders" style={{color:'white', textDecoration:'none', fontWeight:'bold', display:'flex', alignItems:'center', gap:'5px', background:'#e77600', padding:'5px 15px', borderRadius:'20px'}}><span>📦</span> Orders</Link>
-           <Link href="/chat" style={{color:'white', textDecoration:'none', fontWeight:'bold', display:'flex', alignItems:'center', gap:'5px', background:'rgba(255,255,255,0.1)', padding:'5px 10px', borderRadius:'4px'}}><span>💬</span> Messages</Link>
-           <Link href="/" style={{color:'white', textDecoration:'none', fontWeight:'bold'}}>Back to Market</Link>
+           
+           <Link href="/seller/orders" style={{color:'white', textDecoration:'none', fontWeight:'bold', display:'flex', alignItems:'center', gap:'5px', background:'#e77600', padding:'8px 15px', borderRadius:'20px', transition: 'all 0.2s'}}>
+             <span>📦</span> Orders
+           </Link>
+
+           {/* FIXED: Changed to blue background and blue text to make it visible */}
+           <Link href="/chat" style={{color:'#2563eb', textDecoration:'none', fontWeight:'bold', display:'flex', alignItems:'center', gap:'5px', background:'#eff6ff', padding:'8px 15px', borderRadius:'20px', transition: 'all 0.2s'}}>
+             <span>💬</span> Messages
+           </Link>
+
+           {/* FIXED: Changed to slate gray text so it's readable on white background */}
+           <Link href="/" style={{color:'#475569', textDecoration:'none', fontWeight:'bold', transition: 'all 0.2s'}}>
+             Back to Market
+           </Link>
+
         </div>
       </nav>
 
@@ -209,7 +222,6 @@ export default function SellerDashboard() {
                   </div>
                   <div className="form-group"><label>Description</label><textarea className="input-field" rows={5} value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} /></div>
 
-                  {/* --- UPDATED VARIANT BUILDER WITH CLEAR INSTRUCTIONS --- */}
                   <div className="form-section">
                     <h3 className="section-title">Variants (e.g., Color, Size)</h3>
                     {variants.map((variant, vIndex) => (
@@ -233,7 +245,6 @@ export default function SellerDashboard() {
                                 <input type="file" accept="image/*" style={{display:'none'}} onChange={(e) => handleVariantImageUpload(e, vIndex, oIndex)} />
                               </label>
                               
-                              {/* --- NEW: CLEAR INSTRUCTION TEXT --- */}
                               <small style={{color:'#2563eb', fontSize:'0.75rem', textAlign:'center', maxWidth:'100px'}}>
                                 (Optional) Link Image
                               </small>
