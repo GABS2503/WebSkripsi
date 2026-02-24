@@ -464,3 +464,59 @@ button[style*="color:red"]:hover, button[style*="color: red"]:hover, button[styl
 .leaflet-container {
   z-index: 1 !important;
 }
+
+/* =========================================
+   ACCESSIBILITY (A11Y) OVERRIDES
+   ========================================= */
+
+/* 1. Large Text Mode */
+body.a11y-large-text {
+  font-size: 130% !important;
+}
+body.a11y-large-text h1, body.a11y-large-text h2, body.a11y-large-text h3 {
+  font-size: 150% !important;
+}
+body.a11y-large-text p, body.a11y-large-text span, body.a11y-large-text a, body.a11y-large-text button, body.a11y-large-text input {
+  font-size: 115% !important;
+}
+
+/* 2. High Contrast Mode */
+body.a11y-high-contrast {
+  background-color: #000000 !important;
+  color: #ffffff !important;
+}
+body.a11y-high-contrast * {
+  border-color: #ffffff !important;
+  color: #ffffff !important;
+}
+body.a11y-high-contrast .card, body.a11y-high-contrast .navbar, body.a11y-high-contrast div {
+  background-color: #000000 !important;
+  box-shadow: 0 0 0 2px #ffffff !important;
+}
+body.a11y-high-contrast button, body.a11y-high-contrast .btn-primary {
+  background-color: #ffff00 !important;
+  color: #000000 !important;
+  font-weight: 900 !important;
+}
+
+/* 3. Dyslexia Friendly Font */
+body.a11y-dyslexic * {
+  font-family: 'Comic Sans MS', 'OpenDyslexic', sans-serif !important;
+  letter-spacing: 0.05em !important;
+  word-spacing: 0.1em !important;
+}
+
+/* 4. Highlight Links */
+body.a11y-highlight-links a, body.a11y-highlight-links button {
+  outline: 3px solid #ff9800 !important;
+  outline-offset: 2px !important;
+  text-decoration: underline !important;
+  font-weight: 800 !important;
+}
+
+/* 5. Click-to-Read Hover Effect */
+.a11y-reading-target {
+  outline: 4px dashed #2563eb !important;
+  background-color: rgba(37, 99, 235, 0.1) !important;
+  cursor: help !important;
+}
