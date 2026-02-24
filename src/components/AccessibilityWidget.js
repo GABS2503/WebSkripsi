@@ -37,38 +37,38 @@ export default function AccessibilityWidget() {
       return;
     }
 
-    // Highlight element being hovered over
+    // 1. Highlight element being hovered over
     const handleMouseOver = (e) => {
-      if (!e.target.closest('#a11y-widget')) { // Don't highlight the widget itself
+      if (!e.target.closest('#a11y-widget')) { 
         e.target.classList.add('a11y-reading-target');
       }
     };
 
-    // Remove highlight when mouse leaves
+    // 2. Remove highlight when mouse leaves (THIS WAS MISSING!)
+    const handleMouseOut = (e) => {
+      e.target.classList.remove('a11y-reading-target');
+    };
+
+    // 3. Read text out loud on click in Indonesian
     const handleClick = (e) => {
-      // If clicking inside the widget menu, let it happen normally
       if (e.target.closest('#a11y-widget')) return; 
 
-      // Otherwise, prevent clicking links/buttons so the user can just listen
       e.preventDefault();
       e.stopPropagation();
 
-      window.speechSynthesis.cancel(); // Stop current speech
+      window.speechSynthesis.cancel(); 
       const textToRead = e.target.innerText || e.target.alt || e.target.ariaLabel || e.target.textContent;
       
       if (textToRead) {
         const utterance = new SpeechSynthesisUtterance(textToRead);
-        
-        // --- NEW LINE: Set language to Indonesian ---
-        utterance.lang = 'id-ID'; 
-        
+        utterance.lang = 'id-ID'; // Forces Indonesian pronunciation
         window.speechSynthesis.speak(utterance);
       }
     };
 
     document.addEventListener('mouseover', handleMouseOver);
     document.addEventListener('mouseout', handleMouseOut);
-    document.addEventListener('click', handleClick, true); // True = Capture phase
+    document.addEventListener('click', handleClick, true); 
 
     return () => {
       document.removeEventListener('mouseover', handleMouseOver);
