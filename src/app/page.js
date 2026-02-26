@@ -271,7 +271,7 @@ export default function Marketplace() {
         {/* --- LIVE SECTION --- */}
         {streams.length > 0 && (
           <div style={{ background:'white', padding:'1.5rem', marginBottom:'3rem', borderRadius:'16px', boxShadow:'var(--shadow-sm)', border: '1px solid #e2e8f0' }}>
-              <h3 style={{margin:'0 0 1.5rem 0', color:'#e11d48'}}>🔴 Amazon Live | MSME Edition</h3>
+              <h3 style={{margin:'0 0 1.5rem 0', color:'#e11d48'}}>🔴 Live Stream | MSME Edition</h3>
               <div style={{display:'flex', gap:'1.5rem', overflowX:'auto', paddingBottom: '1rem'}}>
                 {streams.map((stream) => (
                   <Link key={stream.id} href={`/live/${stream.documentId}`} style={{textDecoration:'none', color:'inherit', minWidth:'280px'}}>
