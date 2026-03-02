@@ -35,21 +35,45 @@ export default function SellerDashboard() {
   const SERVICE_CATS = ["Electronics Repair", "House Cleaning", "Massage/Spa", "Tutoring", "Graphic Design", "Laundry", "Catering", "Consulting", "Transport"];
   const currentCategories = activeTab === 'product' ? PRODUCT_CATS : SERVICE_CATS;
 
-  const fetchMyItems = useCallback(async () => {
+const fetchMyItems = useCallback(async () => {
     if (activeTab === 'settings') return;
-    const userStr = localStorage.getItem('user'); const token = localStorage.getItem('token');
+    const userStr = localStorage.getItem('user'); 
+    const token = localStorage.getItem('token');
     if (!userStr || !token) return;
-    const user = JSON.parse(userStr); const endpoint = activeTab === 'product' ? 'products' : activeTab === 'service' ? 'services' : 'livestreams';
+    
+    const user = JSON.parse(userStr); 
+    const endpoint = activeTab === 'product' ? 'products' : activeTab === 'service' ? 'services' : 'livestreams';
+    
     try {
       const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/${endpoint}?filters[seller][id][$eq]=${user.id}&populate=*&sort=createdAt:desc`, { headers: { Authorization: `Bearer ${token}` } });
-      const normalizedItems = res.data.data.map(item => ({ ...item.attributes, _id: item.id, _documentId: item.documentId, id: item.documentId || item.id }));
+      
+      // FIXED: Safely extract data whether it's Strapi v4 (item.attributes) or v5 (item directly)
+      const normalizedItems = res.data.data.map(item => {
+        const itemData = item.attributes || item;
+        return { ...itemData, _id: item.id, _documentId: item.documentId, id: item.documentId || item.id };
+      });
       setMyItems(normalizedItems);
 
       if (activeTab === 'livestream') {
-        const [prodRes, servRes] = await Promise.all([ axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/products?filters[seller][id][$eq]=${user.id}`, { headers: { Authorization: `Bearer ${token}` } }), axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/services?filters[seller][id][$eq]=${user.id}`, { headers: { Authorization: `Bearer ${token}` } }) ]);
-        setAllItemsForLive([...prodRes.data.data.map(i => ({ id: i.documentId || i.id, name: i.attributes?.name || i.name, type: 'product' })), ...servRes.data.data.map(i => ({ id: i.documentId || i.id, name: i.attributes?.name || i.name, type: 'service' }))]);
+        const [prodRes, servRes] = await Promise.all([ 
+          axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/products?filters[seller][id][$eq]=${user.id}`, { headers: { Authorization: `Bearer ${token}` } }), 
+          axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/services?filters[seller][id][$eq]=${user.id}`, { headers: { Authorization: `Bearer ${token}` } }) 
+        ]);
+        
+        setAllItemsForLive([
+          ...prodRes.data.data.map(i => {
+             const d = i.attributes || i;
+             return { id: i.documentId || i.id, name: d.name, type: 'product' };
+          }), 
+          ...servRes.data.data.map(i => {
+             const d = i.attributes || i;
+             return { id: i.documentId || i.id, name: d.name, type: 'service' };
+          })
+        ]);
       }
-    } catch (err) { console.error("Failed to fetch items", err); }
+    } catch (err) { 
+      console.error("Failed to fetch items", err); 
+    }
   }, [activeTab]);
 
   useEffect(() => {
@@ -162,12 +186,10 @@ export default function SellerDashboard() {
              <span>📦</span> Orders
            </Link>
 
-           {/* FIXED: Changed to blue background and blue text to make it visible */}
            <Link href="/chat" style={{color:'#2563eb', textDecoration:'none', fontWeight:'bold', display:'flex', alignItems:'center', gap:'5px', background:'#eff6ff', padding:'8px 15px', borderRadius:'20px', transition: 'all 0.2s'}}>
              <span>💬</span> Messages
            </Link>
 
-           {/* FIXED: Changed to slate gray text so it's readable on white background */}
            <Link href="/" style={{color:'#475569', textDecoration:'none', fontWeight:'bold', transition: 'all 0.2s'}}>
              Back to Market
            </Link>
@@ -303,21 +325,69 @@ export default function SellerDashboard() {
           )}
         </div>
 
+  {/* --- DYNAMIC RENDER SECTION --- */}
         {activeTab !== 'settings' && (
           <div style={{ marginTop: '3rem', borderTop: '1px solid #e5e7eb', paddingTop: '2rem' }}>
-            <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem', color: '#111827' }}>Your {activeTab === 'product' ? 'Products' : activeTab === 'service' ? 'Services' : 'Livestreams'}</h2>
-            {myItems.length === 0 ? (<p style={{ color: '#6b7280' }}>You haven't listed any {activeTab}s yet.</p>) : (
-              <div className="grid-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))' }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#1f2937', marginBottom: '1.5rem' }}>
+              Your {activeTab === 'product' ? 'Products' : activeTab === 'service' ? 'Services' : 'Livestreams'}
+            </h2>
+            
+            {myItems.length === 0 ? (
+              <p style={{ color: '#6b7280', fontSize: '0.875rem' }}>You haven't listed any {activeTab}s yet.</p>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '1.5rem' }}>
                 {myItems.map((item) => {
-                  const media = item.media?.data || item.media; const firstImg = Array.isArray(media) ? media[0] : media; const imgUrl = firstImg?.attributes?.url || firstImg?.url ? `${process.env.NEXT_PUBLIC_API_URL}${firstImg.attributes?.url || firstImg.url}` : null;
+                  const media = item.media?.data || item.media; 
+                  const firstImg = Array.isArray(media) ? media[0] : media; 
+                  const imgUrl = firstImg?.attributes?.url || firstImg?.url ? `${process.env.NEXT_PUBLIC_API_URL}${firstImg.attributes?.url || firstImg.url}` : null;
+                  
+                  // Determine badge colors based on active tab
+                  const badgeColor = activeTab === 'service' ? '#15803d' : activeTab === 'livestream' ? '#dc2626' : '#374151';
+                  
                   return (
-                    <div key={item.id} className="card" style={{ padding: '1rem' }}>
-                      <div style={{ height: '150px', background: '#f9fafb', marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', overflow: 'hidden' }}>{imgUrl ? <img src={imgUrl} style={{width:'100%', height:'100%', objectFit:'cover'}} /> : <span style={{fontSize:'2rem'}}>📦</span>}</div>
-                      <h3 style={{ fontSize: '1rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>{item.name || item.title}</h3>
-                      <div style={{ fontWeight: 'bold', color: '#B12704', marginBottom: '1rem' }}>{item.price ? `Rp ${item.price.toLocaleString()}` : 'Live Stream'}</div>
-                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: 'auto' }}>
-                        <button onClick={() => handleEdit(item)} className="btn-secondary" style={{ flex: 1, textAlign: 'center', fontSize: '0.8rem' }}>Edit</button>
-                        <button onClick={() => handleDelete(item.id)} style={{ flex: 1, background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem' }}>Delete</button>
+                    <div key={item.id} style={{ backgroundColor: 'white', borderRadius: '0.75rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e5e7eb', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                      
+                      {/* Image Container */}
+                      <div style={{ height: '160px', backgroundColor: '#f3f4f6', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {imgUrl ? (
+                          <img src={imgUrl} alt={item.name || item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          <span style={{ color: '#9ca3af', fontSize: '0.875rem', fontWeight: '500' }}>No Image</span>
+                        )}
+                        
+                        {/* Category Badge */}
+                        <span style={{ position: 'absolute', top: '0.5rem', left: '0.5rem', backgroundColor: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(4px)', padding: '0.25rem 0.5rem', borderRadius: '0.25rem', fontSize: '0.75rem', fontWeight: 'bold', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', color: badgeColor }}>
+                          {activeTab === 'livestream' ? 'Live Stream' : (item.category || activeTab)}
+                        </span>
+                      </div>
+                      
+                      {/* Details Container */}
+                      <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', flex: 1 }}>
+                        <h3 style={{ fontWeight: '600', color: '#1f2937', margin: '0 0 0.25rem 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={item.name || item.title}>
+                          {item.name || item.title}
+                        </h3>
+                        
+                        {activeTab === 'livestream' ? (
+                          <p style={{ color: '#ef4444', fontWeight: 'bold', margin: '0.25rem 0', fontSize: '0.875rem' }}>● LIVE NOW</p>
+                        ) : (
+                          <p style={{ color: '#2563eb', fontWeight: 'bold', margin: '0.25rem 0', fontSize: '1.125rem' }}>
+                            Rp {item.price?.toLocaleString('id-ID')}
+                          </p>
+                        )}
+                        
+                        {activeTab === 'product' && (
+                          <p style={{ color: '#6b7280', fontSize: '0.75rem', margin: '0' }}>Stock: {item.stock || 0}</p>
+                        )}
+                        
+                        {/* Buttons */}
+                        <div style={{ marginTop: 'auto', paddingTop: '1rem', display: 'flex', gap: '0.5rem' }}>
+                          <button onClick={() => handleEdit(item)} style={{ flex: 1, backgroundColor: '#f9fafb', color: '#2563eb', border: '1px solid #bfdbfe', padding: '0.375rem', borderRadius: '0.375rem', fontSize: '0.875rem', fontWeight: '500', cursor: 'pointer' }}>
+                            Edit
+                          </button>
+                          <button onClick={() => handleDelete(item.id)} style={{ flex: 1, backgroundColor: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', padding: '0.375rem', borderRadius: '0.375rem', fontSize: '0.875rem', fontWeight: '500', cursor: 'pointer' }}>
+                            Delete
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
