@@ -2,6 +2,7 @@ import './globals.css';
 import AccessibilityToolbar from '../components/AccessibilityToolbar';
 import AccessibilityWidget from '@/components/AccessibilityWidget';
 import { CartProvider } from '@/context/CartContext'; // Import CartProvider
+import Link from 'next/link';
 
 export const metadata = {
   title: 'MSME Market',
@@ -21,3 +22,4 @@ export default function RootLayout({ children }) {
     </html>
   );
 }
+

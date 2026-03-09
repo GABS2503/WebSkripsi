@@ -42,7 +42,7 @@ export default function CartPage() {
     const orderName = `Order from ${groupData.sellerName} (${items.length} items)`;
 
     try {
-      // Create transaction token
+      // 1. Create transaction token from your Next.js backend
       const res = await axios.post('/api/payment', { 
         id: `CART-${Date.now()}`, 
         price: totalAmount, 
@@ -53,17 +53,66 @@ export default function CartPage() {
 
       const token = res.data.token;
 
-      // Trigger Snap Popup
+      // 2. Trigger Snap Popup
       setTimeout(() => {
         // @ts-ignore
         if (window.snap) {
           window.snap.pay(token, {
-            onSuccess: function(result) {
-              alert("Payment Success!");
-              items.forEach(i => removeFromCart(i.uniqueId));
+           onSuccess: async function(result) {
+  try {
+    const userToken = localStorage.getItem('token'); 
+    
+    // --- NEW FIX: Get the actual logged-in user's name ---
+    const storedUserStr = localStorage.getItem('user');
+    const loggedInUser = storedUserStr ? JSON.parse(storedUserStr) : null;
+    const finalBuyerName = loggedInUser ? loggedInUser.username : (items[0]?.customerInfo?.name || "Guest");
+    // -----------------------------------------------------
+
+    const locationData = items[0]?.customerInfo?.location || items[0]?.customerInfo || {};
+    const formattedSellerId = isNaN(sellerId) ? sellerId : Number(sellerId);
+
+    const payload = {
+      data: {
+        order_id: result.order_id, 
+        total_price: totalAmount,
+        buyer_name: finalBuyerName, // <-- Uses the real username now!
+        seller: formattedSellerId,
+        items: JSON.stringify(items),
+        delivery_location: JSON.stringify(locationData),
+        order_status: "paid",
+        publishedAt: new Date().toISOString() 
+      }
+    };
+
+    // ... (rest of the axios code stays the same)
+
+                // Add auth header if user is logged in
+                const headers = userToken ? { Authorization: `Bearer ${userToken}` } : {};
+
+                // Save to Strapi
+                await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/orders`, payload, { headers });
+
+                alert("Payment Success! Order sent to seller.");
+                
+                // Clear the purchased items from the cart
+                items.forEach(i => removeFromCart(i.uniqueId));
+
+              } catch (strapiError) {
+                console.error("Failed to save order to Strapi:", strapiError);
+                alert("Payment was successful, but there was an error saving the order to the database.");
+              }
+              // ==========================================
+              
             },
-            onPending: function(result) { alert("Waiting for payment..."); },
-            onError: function(result) { alert("Payment failed"); }
+            onPending: function(result) { 
+              alert("Waiting for payment..."); 
+            },
+            onError: function(result) { 
+              alert("Payment failed"); 
+            },
+            onClose: function () {
+              alert("You closed the popup without finishing the payment.");
+            }
           });
         }
       }, 500);

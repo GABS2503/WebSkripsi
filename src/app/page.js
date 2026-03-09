@@ -219,9 +219,26 @@ export default function Marketplace() {
                  <span>Your Account</span>
                </div>
                
+               {/* ==========================================
+                   NEW CART & MY ORDERS BUTTONS
+                   ========================================== */}
+               
+               {/* Global Cart Button */}
+               <Link href="/cart" className="nav-item" style={{background:'#fef3c7', padding:'8px 12px', borderRadius:'12px', color:'#92400e', fontWeight:'bold', display:'flex', alignItems:'center', gap:'5px', textDecoration:'none'}}>
+                 🛒 Cart
+               </Link>
+
+               {/* My Orders Button (Only for Buyers) */}
+               {!user.isSeller && (
+                 <Link href="/orders" className="nav-item" style={{background:'#e5e7eb', padding:'8px 12px', borderRadius:'12px', color:'#374151', fontWeight:'bold', display:'flex', alignItems:'center', gap:'5px', textDecoration:'none'}}>
+                   📦 My Orders
+                 </Link>
+               )}
+
+               {/* Seller Dashboard Button (Only for Sellers) */}
                {user.isSeller && (
-                 <Link href="/seller" className="nav-item" style={{background:'#eff6ff', padding:'8px 12px', borderRadius:'12px'}}>
-                   <span style={{color: '#2563eb'}}>Seller Zone</span>
+                 <Link href="/seller" className="nav-item" style={{background:'#eff6ff', padding:'8px 12px', borderRadius:'12px', display:'flex', alignItems:'center', textDecoration:'none'}}>
+                   <span style={{color: '#2563eb', fontWeight:'bold'}}>Seller Zone</span>
                  </Link>
                )}
 
