@@ -35,7 +35,7 @@ export default function SellerDashboard() {
   const SERVICE_CATS = ["Electronics Repair", "House Cleaning", "Massage/Spa", "Tutoring", "Graphic Design", "Laundry", "Catering", "Consulting", "Transport"];
   const currentCategories = activeTab === 'product' ? PRODUCT_CATS : SERVICE_CATS;
 
-const fetchMyItems = useCallback(async () => {
+  const fetchMyItems = useCallback(async () => {
     if (activeTab === 'settings') return;
     const userStr = localStorage.getItem('user'); 
     const token = localStorage.getItem('token');
@@ -47,7 +47,6 @@ const fetchMyItems = useCallback(async () => {
     try {
       const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/${endpoint}?filters[seller][id][$eq]=${user.id}&populate=*&sort=createdAt:desc`, { headers: { Authorization: `Bearer ${token}` } });
       
-      // FIXED: Safely extract data whether it's Strapi v4 (item.attributes) or v5 (item directly)
       const normalizedItems = res.data.data.map(item => {
         const itemData = item.attributes || item;
         return { ...itemData, _id: item.id, _documentId: item.documentId, id: item.documentId || item.id };
@@ -176,228 +175,305 @@ const fetchMyItems = useCallback(async () => {
   if (isLoading) return <div className="container" style={{textAlign:'center', padding:'2rem'}}>Loading...</div>;
 
   return (
-    <div>
-      {/* NAVBAR */}
-      <nav className="navbar" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-        <h1 style={{ margin: 0, color: '#2563eb' }}>Seller Dashboard</h1>
-        <div className="nav-links" style={{display:'flex', gap:'1.5rem', alignItems:'center'}}>
-           
-           <Link href="/seller/orders" style={{color:'white', textDecoration:'none', fontWeight:'bold', display:'flex', alignItems:'center', gap:'5px', background:'#e77600', padding:'8px 15px', borderRadius:'20px', transition: 'all 0.2s'}}>
-             <span>📦</span> Orders
-           </Link>
-
-           <Link href="/chat" style={{color:'#2563eb', textDecoration:'none', fontWeight:'bold', display:'flex', alignItems:'center', gap:'5px', background:'#eff6ff', padding:'8px 15px', borderRadius:'20px', transition: 'all 0.2s'}}>
-             <span>💬</span> Messages
-           </Link>
-
-           <Link href="/" style={{color:'#475569', textDecoration:'none', fontWeight:'bold', transition: 'all 0.2s'}}>
-             Back to Market
-           </Link>
-
+    <div className="container" style={{ maxWidth: '1000px', padding: '2rem 1rem' }}>
+      
+      {/* --- DASHBOARD HEADER --- */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1.5rem' }}>
+        <h1 style={{ color: 'var(--action-primary)', fontSize: '2.4rem', margin: 0, fontWeight: '800', letterSpacing: '-1px' }}>
+          Seller Dashboard
+        </h1>
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          <button 
+            className="btn-primary" 
+            style={{ background: '#f59e0b', color: '#fff', padding: '0.6rem 1.5rem', minWidth: '120px', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)' }}
+            onClick={() => router.push('/seller/orders')}
+          >
+            📦 Orders
+          </button>
+          <button 
+            className="btn-secondary" 
+            style={{ background: 'var(--bg-element)', border: '1px solid var(--border-strong)' }}
+            onClick={() => router.push('/')}
+          >
+            Back to Market
+          </button>
         </div>
-      </nav>
+      </div>
 
-      <div className="container">
-        <div className="form-container" style={{maxWidth:'800px'}}>
-          <h2 style={{ textAlign: 'center', marginBottom: '1.5rem', color: '#111827' }}>{editingId ? `Edit ${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}` : 'Create New Listing'}</h2>
+{/* --- PREMIUM TAB NAVIGATION --- */}
+      <div className="tab-group">
+        <button 
+          className={`tab-btn ${activeTab === 'product' ? 'active' : ''}`} 
+          onClick={() => { setActiveTab('product'); resetForm('product'); }}
+        >
+          🛍️ Product
+        </button>
+        <button 
+          className={`tab-btn ${activeTab === 'service' ? 'active' : ''}`} 
+          onClick={() => { setActiveTab('service'); resetForm('service'); }}
+        >
+          🛠️ Service
+        </button>
+        <button 
+          className={`tab-btn live ${activeTab === 'livestream' ? 'active' : ''}`} 
+          onClick={() => { setActiveTab('livestream'); resetForm('livestream'); }}
+        >
+          🔴 Go Live
+        </button>
+        <button 
+          className={`tab-btn ${activeTab === 'settings' ? 'active' : ''}`} 
+          onClick={() => { setActiveTab('settings'); resetForm('settings'); }}
+        >
+          ⚙️ Settings
+        </button>
+      </div>
+
+      {/* --- TAB CONTENT: PRODUCT / SERVICE --- */}
+      {(activeTab === 'product' || activeTab === 'service') && (
+        <div className="form-section" style={{ background: 'var(--bg-element)', padding: '2.5rem', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-md)', border: '1px solid var(--border-color)' }}>
+          <h2 className="section-title" style={{ marginTop: 0, marginBottom: '2rem', fontSize: '1.6rem', color: 'var(--text-main)' }}>
+            {editingId ? 'Edit' : 'Create New'} {activeTab === 'product' ? 'Listing' : 'Service'}
+          </h2>
           
-          <div className="tab-group">
-            <button onClick={() => { setActiveTab('product'); resetForm('product'); }} className={`tab-btn ${activeTab === 'product' ? 'active' : ''}`}>Product</button>
-            <button onClick={() => { setActiveTab('service'); resetForm('service'); }} className={`tab-btn ${activeTab === 'service' ? 'active' : ''}`}>Service</button>
-            <button onClick={() => { setActiveTab('livestream'); resetForm('livestream'); }} className={`tab-btn ${activeTab === 'livestream' ? 'active' : ''}`} style={{borderColor:'#ef4444', color: activeTab==='livestream' ? 'white' : '#ef4444', background: activeTab==='livestream' ? '#ef4444' : 'transparent'}}>Go Live</button>
-            <button onClick={() => { setActiveTab('settings'); }} className={`tab-btn ${activeTab === 'settings' ? 'active' : ''}`}>⚙️ Settings</button>
-          </div>
+          <form onSubmit={handleSubmit}>
+            <div className="form-group">
+              <label>Item Name</label>
+              <input 
+                type="text" className="input-field" placeholder="Enter product name..."
+                value={formData.name || ''} onChange={(e) => setFormData({...formData, name: e.target.value})} required 
+              />
+            </div>
 
-          {activeTab === 'settings' ? (
-            <div style={{animation:'fadeIn 0.3s'}}>
-              <h2 style={{textAlign:'center', marginBottom: '2rem'}}>Store & Payment Profile</h2>
-              <form onSubmit={handleSaveSettings}>
-                <div className="form-section">
-                    <h3 className="section-title">Midtrans Payment Keys</h3>
-                    <div className="form-group"><label>Server Key</label><input className="input-field" type="password" value={settingsData.midtransServerKey} onChange={e => setSettingsData({...settingsData, midtransServerKey: e.target.value})} required /></div>
-                    <div className="form-group"><label>Client Key</label><input className="input-field" value={settingsData.midtransClientKey} onChange={e => setSettingsData({...settingsData, midtransClientKey: e.target.value})} required /></div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', marginBottom: '1.5rem' }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label>Price (Rp)</label>
+                <input 
+                  type="number" className="input-field" placeholder="e.g. 50000"
+                  value={formData.price || ''} onChange={(e) => setFormData({...formData, price: e.target.value})} required 
+                />
+              </div>
+              
+              {activeTab === 'product' && (
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label>Total Stock</label>
+                  <input 
+                    type="number" className="input-field" placeholder="e.g. 100"
+                    value={formData.stock || ''} onChange={(e) => setFormData({...formData, stock: e.target.value})} 
+                  />
                 </div>
-                <div className="form-section">
-                    <h3 className="section-title">Store Details</h3>
-                    <div className="form-group"><label>What does your store sell?</label><textarea className="input-field" rows={3} placeholder="e.g. We sell handmade clothing..." value={settingsData.shopDescription} onChange={e => setSettingsData({...settingsData, shopDescription: e.target.value})} required /></div>
-                    <div className="form-group" style={{marginTop: '1.5rem'}}><label>Pin Your Physical Store Location</label><MapPicker onLocationSelect={(loc) => setSettingsData({...settingsData, shopLocation: loc})} />{settingsData.shopLocation.lat ? (<div style={{marginTop:'10px', color:'var(--success-color)', fontWeight:'bold'}}>✅ Location Pinned</div>) : (<div style={{marginTop:'10px', color:'var(--danger-color)', fontWeight:'bold'}}>❌ Please pin your location</div>)}</div>
+              )}
+            </div>
+
+            <div className="form-group">
+              <label>Description</label>
+              <textarea 
+                className="input-field" placeholder="Describe your item in detail..." style={{ minHeight: '120px' }}
+                value={formData.description || ''} onChange={(e) => setFormData({...formData, description: e.target.value})} 
+              />
+            </div>
+
+            {/* VARIANTS SECTION */}
+            <div className="variant-box" style={{ background: 'var(--bg-input)', padding: '1.5rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', marginBottom: '1.5rem' }}>
+              <label style={{ display: 'block', fontWeight: '700', marginBottom: '1rem', color: 'var(--text-main)' }}>
+                Variants (e.g., Color, Size)
+              </label>
+              
+              {variants.map((v, vIdx) => (
+                <div key={vIdx} style={{ background: 'var(--bg-element)', padding: '1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-strong)', marginBottom: '1rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                    <h4 style={{ margin: 0, color: 'var(--text-main)', fontSize: '1.1rem' }}>{v.name}</h4>
+                    <button type="button" onClick={() => removeVariantType(vIdx)} style={{ color: 'var(--danger-color)', border: 'none', background: 'var(--danger-bg)', padding: '0.4rem 0.8rem', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 'bold' }}>Remove Variant</button>
+                  </div>
+                  
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '1rem' }}>
+                    {v.options.map((o, oIdx) => (
+                      <div key={oIdx} style={{ background: 'var(--bg-page)', padding: '0.5rem 0.8rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontSize: '0.9rem', fontWeight: '600', color: 'var(--text-secondary)' }}>{o.name}</span>
+                        {o.previewUrl || o.image?.url ? (
+                          <img src={o.previewUrl || `${process.env.NEXT_PUBLIC_API_URL}${o.image.url}`} alt="variant" style={{ width: '30px', height: '30px', borderRadius: '4px', objectFit: 'cover' }} />
+                        ) : (
+                          <input type="file" accept="image/*" onChange={(e) => handleVariantImageUpload(e, vIdx, oIdx)} style={{ width: '90px', fontSize: '10px' }} />
+                        )}
+                        <button type="button" onClick={() => removeVariantOption(vIdx, oIdx)} style={{ color: 'var(--danger-color)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: '1.2rem' }}>×</button>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <input type="text" className="input-field" placeholder={`New ${v.name} option (e.g. Red)`} value={newVariantOption} onChange={(e) => setNewVariantOption(e.target.value)} />
+                    <button type="button" className="btn-secondary" style={{ whiteSpace: 'nowrap' }} onClick={() => addVariantOption(vIdx)}>+ Add Option</button>
+                  </div>
                 </div>
-                <button type="submit" className="btn-primary" style={{marginTop:'1rem'}} disabled={isSubmitting}>{isSubmitting ? 'Saving...' : 'Save All Settings'}</button>
-              </form>
+              ))}
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '1rem' }}>
+                <input 
+                  type="text" className="input-field" placeholder="New Variant Type (e.g., Size)" 
+                  value={newVariantName} onChange={(e) => setNewVariantName(e.target.value)}
+                />
+                <button type="button" className="btn-secondary" style={{ whiteSpace: 'nowrap' }} onClick={addVariantType}>+ Add Variant Group</button>
+              </div>
+            </div>
+
+            {/* ATTRIBUTES SECTION */}
+            <div className="variant-box" style={{ background: 'var(--bg-input)', padding: '1.5rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', marginBottom: '1.5rem' }}>
+               <label style={{ display: 'block', fontWeight: '700', marginBottom: '1rem', color: 'var(--text-main)' }}>
+                 Custom Attributes (e.g., Brand, Material)
+               </label>
+               {attributes.map((attr, idx) => (
+                 <div key={idx} style={{ display: 'flex', gap: '10px', marginBottom: '0.75rem', alignItems: 'center' }}>
+                   <input type="text" className="input-field" placeholder="Name (e.g. Brand)" value={attr.key} onChange={(e) => updateAttribute(idx, 'key', e.target.value)} />
+                   <input type="text" className="input-field" placeholder="Value (e.g. Nike)" value={attr.value} onChange={(e) => updateAttribute(idx, 'value', e.target.value)} />
+                   <button type="button" onClick={() => removeAttribute(idx)} style={{ color: 'var(--danger-color)', background: 'var(--danger-bg)', border: 'none', borderRadius: 'var(--radius-sm)', width: '40px', height: '40px', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+                 </div>
+               ))}
+               <button type="button" className="btn-secondary" onClick={addAttribute} style={{ marginTop: '0.5rem' }}>
+                 + Add Attribute Row
+               </button>
+            </div>
+
+            <div className="form-group">
+              <label>Category</label>
+              <select 
+                className="input-field" value={formData.category || ''} 
+                onChange={handleCategoryChange} required
+              >
+                <option value="">Select a category...</option>
+                {currentCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                <option value="custom_option">-- Add Custom Category --</option>
+              </select>
+              {isCustomCategory && (
+                <input 
+                  type="text" className="input-field" style={{marginTop: '0.5rem'}}
+                  placeholder="Enter custom category..."
+                  value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value})} required
+                />
+              )}
+            </div>
+
+            <div className="form-group">
+              <label>Upload Main Media (Select Multiple)</label>
+              <div style={{ border: '2px dashed var(--border-strong)', padding: '2rem', textAlign: 'center', borderRadius: 'var(--radius-md)', background: 'var(--bg-page)', transition: 'all 0.2s' }}>
+                <input 
+                  type="file" multiple className="file-input" 
+                  onChange={handleMainMediaChange} accept="image/*,video/*"
+                  style={{ width: '100%', cursor: 'pointer' }}
+                />
+              </div>
+              
+              {/* IMAGE PREVIEWS */}
+              {previews.length > 0 && (
+                <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap', marginTop: '1.5rem' }}>
+                  {previews.map((src, idx) => (
+                    <div key={idx} style={{ position: 'relative', width: '100px', height: '100px', borderRadius: 'var(--radius-sm)', overflow: 'hidden', boxShadow: 'var(--shadow-sm)', border: '1px solid var(--border-color)' }}>
+                      <img src={src} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <button type="button" onClick={() => removeImage(idx)} style={{ position: 'absolute', top: '4px', right: '4px', background: 'var(--danger-color)', color: 'white', border: 'none', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: '1rem', marginTop: '2.5rem' }}>
+              <button type="submit" className="btn-primary" disabled={isSubmitting} style={{ flex: 2, padding: '1rem', fontSize: '1.1rem' }}>
+                {isSubmitting ? 'Saving...' : editingId ? '💾 Update Listing' : '🚀 Publish Listing'}
+              </button>
+              {editingId && (
+                <button type="button" className="btn-secondary" onClick={() => resetForm(activeTab)} style={{ flex: 1 }}>Cancel Edit</button>
+              )}
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* --- TAB CONTENT: GO LIVE --- */}
+      {activeTab === 'livestream' && (
+        <div className="form-section" style={{ background: 'var(--bg-element)', padding: '2.5rem', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-md)', border: '1px solid var(--border-color)' }}>
+          <h2 className="section-title" style={{ marginTop: 0, marginBottom: '2rem' }}>Host a Live Stream</h2>
+          <form onSubmit={handleSubmit}>
+            <div className="form-group">
+               <label>Stream Title</label>
+               <input type="text" className="input-field" placeholder="e.g. Flash Sale Weekend!" value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} required />
+            </div>
+            <div className="form-group">
+               <label>YouTube Live URL</label>
+               <input type="text" className="input-field" placeholder="https://youtube.com/..." value={formData.streamUrl} onChange={(e) => setFormData({...formData, streamUrl: e.target.value})} required />
+            </div>
+            <div className="form-group">
+              <label>Feature a Product/Service (Optional)</label>
+              <select className="input-field" value={formData.selectedItemId} onChange={(e) => setFormData({...formData, selectedItemId: e.target.value})}>
+                <option value="">-- None --</option>
+                {allItemsForLive.map(item => (
+                  <option key={item.id} value={item.id}>[{item.type.toUpperCase()}] {item.name}</option>
+                ))}
+              </select>
+            </div>
+            <button type="submit" className="btn-primary" style={{ background: '#ef4444', marginTop: '1.5rem' }} disabled={isSubmitting}>
+              {isSubmitting ? 'Starting...' : '🔴 Start Broadcasting'}
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* --- TAB CONTENT: SETTINGS --- */}
+      {activeTab === 'settings' && (
+        <div className="form-section" style={{ background: 'var(--bg-element)', padding: '2.5rem', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-md)', border: '1px solid var(--border-color)' }}>
+          <h2 className="section-title" style={{ marginTop: 0, marginBottom: '2rem' }}>Store Configuration</h2>
+          <form onSubmit={handleSaveSettings}>
+            <div className="form-group">
+               <label>Store Name / Description</label>
+               <textarea className="input-field" placeholder="Tell buyers about your shop..." style={{ minHeight: '100px' }} value={settingsData.shopDescription} onChange={(e) => setSettingsData({...settingsData, shopDescription: e.target.value})} />
+            </div>
+            <div className="form-group">
+               <label>Midtrans Server Key</label>
+               <input type="password" className="input-field" placeholder="SB-Mid-server-..." value={settingsData.midtransServerKey} onChange={(e) => setSettingsData({...settingsData, midtransServerKey: e.target.value})} />
+            </div>
+            <div className="form-group">
+               <label>Midtrans Client Key</label>
+               <input type="text" className="input-field" placeholder="SB-Mid-client-..." value={settingsData.midtransClientKey} onChange={(e) => setSettingsData({...settingsData, midtransClientKey: e.target.value})} />
+            </div>
+            <div className="form-group" style={{ marginTop: '2rem' }}>
+              <label style={{ color: 'var(--action-primary)', fontWeight: 'bold' }}>📍 Pin Your Store Location (Required for Map Visibility)</label>
+              <div style={{ height: '350px', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '2px solid var(--border-color)', marginBottom: '1rem', boxShadow: 'var(--shadow-sm)' }}>
+                <MapPicker location={settingsData.shopLocation} setLocation={(loc) => setSettingsData({...settingsData, shopLocation: loc})} />
+              </div>
+            </div>
+            <button type="submit" className="btn-primary" style={{ marginTop: '1.5rem' }} disabled={isSubmitting}>
+              {isSubmitting ? 'Saving...' : '💾 Save Configuration'}
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* --- YOUR ITEMS LIST (MANAGEMENT) --- */}
+      {activeTab !== 'settings' && (
+        <div className="form-section" style={{ marginTop: '3rem', background: 'transparent', padding: 0, boxShadow: 'none', border: 'none' }}>
+          <h2 className="section-title" style={{ fontSize: '1.5rem', color: 'var(--text-main)', borderBottom: '2px solid var(--border-color)', paddingBottom: '1rem', marginBottom: '1.5rem' }}>
+            Manage Your {activeTab === 'product' ? 'Products' : activeTab === 'service' ? 'Services' : 'Live Streams'}
+          </h2>
+          {myItems.length === 0 ? (
+            <div style={{ background: 'var(--bg-element)', padding: '3rem', textAlign: 'center', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-strong)' }}>
+              <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem', margin: 0 }}>You haven't listed anything in this category yet.</p>
             </div>
           ) : (
-            <form onSubmit={handleSubmit}>
-              {editingId && (<div style={{background: '#fff7ed', border: '1px solid #fed7aa', color: '#9a3412', padding: '10px', borderRadius: '6px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}><span>Editing <strong>{formData.name || formData.title}</strong> (ID: {editingId})</span><button type="button" onClick={() => resetForm(activeTab)} style={{background:'transparent', border:'1px solid #9a3412', color:'#9a3412', borderRadius:'4px', cursor:'pointer', padding:'2px 8px'}}>Cancel Edit</button></div>)}
-
-              {activeTab === 'livestream' ? (
-                <div style={{ animation: 'fadeIn 0.5s' }}>
-                   <div className="form-group"><label>Stream Title</label><input className="input-field" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} required /></div>
-                   <div className="form-group"><label>YouTube Embed URL</label><input className="input-field" value={formData.streamUrl} onChange={e => setFormData({...formData, streamUrl: e.target.value})} required /></div>
-                   <div className="form-group" style={{marginTop:'1rem', padding:'1rem', background:'#f0fdf4', border:'1px solid #bbf7d0', borderRadius:'8px'}}><label style={{color:'#166534'}}>🛒 Feature a Product (Optional)</label><select className="input-field" value={formData.selectedItemId} onChange={e => setFormData({...formData, selectedItemId: e.target.value})}><option value="">-- No Linked Product --</option>{allItemsForLive.map(item => (<option key={item.id} value={item.id}>{item.type === 'product' ? '📦' : '🛠️'} {item.name}</option>))}</select><small style={{display:'block', marginTop:'5px', color:'#166534'}}>Viewers can buy this item directly from your stream!</small></div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {myItems.map((item, idx) => (
+                <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.5rem', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', background: 'var(--bg-element)', boxShadow: 'var(--shadow-sm)', transition: 'transform 0.2s' }}>
+                  <div>
+                    <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.2rem', color: 'var(--text-main)' }}>{item.name || item.title}</h3>
+                    {item.price && <p style={{ margin: 0, color: 'var(--action-primary)', fontWeight: '800', fontSize: '1.1rem' }}>Rp {item.price.toLocaleString('id-ID')}</p>}
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.75rem' }}>
+                    <button onClick={() => handleEdit(item)} className="btn-secondary" style={{ padding: '0.5rem 1rem', fontSize: '0.95rem' }}>Edit</button>
+                    <button onClick={() => handleDelete(item._documentId || item.id)} className="btn-primary" style={{ background: 'var(--danger-bg)', color: 'var(--danger-color)', padding: '0.5rem 1rem', fontSize: '0.95rem', boxShadow: 'none' }}>Delete</button>
+                  </div>
                 </div>
-              ) : (
-                <>
-                  <div className="flex-row" style={{gap:'1rem'}}>
-                    <div className="form-group" style={{flex:2}}><label>Item Name</label><input className="input-field" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required /></div>
-                    <div className="form-group" style={{flex:1}}><label>Price (Rp)</label><input type="number" className="input-field" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} required /></div>
-                    {activeTab === 'product' && (<div className="form-group" style={{flex:1}}><label>Total Stock</label><input type="number" className="input-field" value={formData.stock} onChange={e => setFormData({...formData, stock: e.target.value})} required /></div>)}
-                  </div>
-                  <div className="form-group"><label>Description</label><textarea className="input-field" rows={5} value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} /></div>
-
-                  <div className="form-section">
-                    <h3 className="section-title">Variants (e.g., Color, Size)</h3>
-                    {variants.map((variant, vIndex) => (
-                      <div key={vIndex} className="variant-box">
-                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'0.5rem'}}>
-                          <strong>{variant.name}</strong>
-                          <button type="button" onClick={() => removeVariantType(vIndex)} style={{color:'red', background:'none', border:'none', cursor:'pointer'}}>Remove Type</button>
-                        </div>
-                        
-                        <div style={{display:'flex', flexWrap:'wrap', gap:'1.5rem', marginBottom:'1rem'}}>
-                          {variant.options.map((option, oIndex) => (
-                            <div key={oIndex} style={{background:'#f3f4f6', padding:'1rem', borderRadius:'8px', display:'flex', flexDirection:'column', alignItems:'center', gap:'0.5rem', border:'1px solid #e5e7eb'}}>
-                              <span style={{fontWeight:'bold', color:'#333'}}>{option.name}</span>
-                              
-                              <label style={{cursor:'pointer', position:'relative', width:'60px', height:'60px', borderRadius:'6px', overflow:'hidden', background:'#ddd', display:'flex', alignItems:'center', justifyContent:'center', border: '2px dashed #9ca3af'}}>
-                                {option.previewUrl || option.image?.url ? (
-                                  <img src={option.previewUrl || (option.image?.url ? `${process.env.NEXT_PUBLIC_API_URL}${option.image.url}` : '')} alt={option.name} style={{width:'100%', height:'100%', objectFit:'cover'}} />
-                                ) : (
-                                  <span style={{fontSize:'2rem', color:'#9ca3af'}}>+</span>
-                                )}
-                                <input type="file" accept="image/*" style={{display:'none'}} onChange={(e) => handleVariantImageUpload(e, vIndex, oIndex)} />
-                              </label>
-                              
-                              <small style={{color:'#2563eb', fontSize:'0.75rem', textAlign:'center', maxWidth:'100px'}}>
-                                (Optional) Link Image
-                              </small>
-
-                              <button type="button" onClick={() => removeVariantOption(vIndex, oIndex)} style={{border:'none', background:'#fee2e2', borderRadius:'4px', cursor:'pointer', color:'#b91c1c', fontWeight:'bold', padding:'2px 8px', marginTop:'5px'}}>Remove</button>
-                            </div>
-                          ))}
-                        </div>
-                        
-                        <div style={{display:'flex', gap:'0.5rem'}}>
-                          <input placeholder={`Add option for ${variant.name}...`} className="input-field" style={{padding:'0.4rem'}} value={newVariantOption} onChange={e => setNewVariantOption(e.target.value)} />
-                          <button type="button" onClick={() => addVariantOption(vIndex)} className="btn-secondary" style={{marginTop:0, padding:'0.4rem 1rem'}}>Add</button>
-                        </div>
-                      </div>
-                    ))}
-                    <div style={{display:'flex', gap:'0.5rem', marginTop:'1rem'}}>
-                      <input placeholder="New Variant Type (e.g., Color)" className="input-field" value={newVariantName} onChange={e => setNewVariantName(e.target.value)} />
-                      <button type="button" onClick={addVariantType} className="btn-secondary" style={{marginTop:0}}>+ Add Variant Type</button>
-                    </div>
-                  </div>
-
-                  <div className="form-section">
-                    <h3 className="section-title">Product Attributes</h3>
-                    {attributes.map((attr, index) => (
-                      <div key={index} style={{display:'flex', gap:'0.5rem', marginBottom:'0.5rem'}}><input placeholder="Key" className="input-field" value={attr.key} onChange={e => updateAttribute(index, 'key', e.target.value)} /><input placeholder="Value" className="input-field" value={attr.value} onChange={e => updateAttribute(index, 'value', e.target.value)} /><button type="button" onClick={() => removeAttribute(index)} style={{color:'red', background:'none', border:'1px solid red', borderRadius:'4px', cursor:'pointer', padding:'0 0.5rem'}}>X</button></div>
-                    ))}
-                    <button type="button" onClick={addAttribute} className="btn-secondary" style={{width:'auto'}}>+ Add Attribute Row</button>
-                  </div>
-
-                  <div className="form-group">
-                    <label>Category</label>
-                    {!isCustomCategory ? (
-                      <select className="input-field" onChange={handleCategoryChange} value={formData.category}>
-                        {currentCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                        <option value="custom_option" style={{fontWeight:'bold', color:'blue'}}>+ Add Custom Category...</option>
-                      </select>
-                    ) : (
-                      <div style={{display:'flex', gap:'0.5rem'}}><input className="input-field" placeholder={`Type ${activeTab} category...`} value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} required /><button type="button" onClick={() => { setIsCustomCategory(false); setFormData({...formData, category: currentCategories[0]}); }} className="btn-secondary" style={{marginTop:0, padding:'0 1rem'}}>Cancel</button></div>
-                    )}
-                  </div>
-
-                  <div className="form-group">
-                    <label>Upload Main Media (Select Multiple)</label>
-                    <input type="file" className="file-input" accept="image/*,video/*" multiple onChange={handleMainMediaChange} required={!editingId && files.length === 0} />
-                    <div style={{display:'flex', gap:'10px', marginTop:'10px', flexWrap:'wrap'}}>
-                      {previews.map((src, index) => (
-                        <div key={index} style={{position:'relative', width:'80px', height:'80px', border:'1px solid #ddd', borderRadius:'8px', overflow:'hidden'}}><img src={src} alt="preview" style={{width:'100%', height:'100%', objectFit:'cover'}} /><button type="button" onClick={() => removeImage(index)} style={{position:'absolute', top:0, right:0, background:'rgba(255,0,0,0.8)', color:'white', border:'none', cursor:'pointer', width:'20px', height:'20px', display:'flex', alignItems:'center', justifyContent:'center'}}>×</button></div>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
-
-              <button type="submit" className="btn-primary" style={{ marginTop: '1.5rem' }} disabled={isSubmitting}>{isSubmitting ? 'Processing...' : (editingId ? 'Update Listing' : 'Publish Listing')}</button>
-            </form>
+              ))}
+            </div>
           )}
         </div>
+      )}
 
-  {/* --- DYNAMIC RENDER SECTION --- */}
-        {activeTab !== 'settings' && (
-          <div style={{ marginTop: '3rem', borderTop: '1px solid #e5e7eb', paddingTop: '2rem' }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#1f2937', marginBottom: '1.5rem' }}>
-              Your {activeTab === 'product' ? 'Products' : activeTab === 'service' ? 'Services' : 'Livestreams'}
-            </h2>
-            
-            {myItems.length === 0 ? (
-              <p style={{ color: '#6b7280', fontSize: '0.875rem' }}>You haven't listed any {activeTab}s yet.</p>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '1.5rem' }}>
-                {myItems.map((item) => {
-                  const media = item.media?.data || item.media; 
-                  const firstImg = Array.isArray(media) ? media[0] : media; 
-                  const imgUrl = firstImg?.attributes?.url || firstImg?.url ? `${process.env.NEXT_PUBLIC_API_URL}${firstImg.attributes?.url || firstImg.url}` : null;
-                  
-                  // Determine badge colors based on active tab
-                  const badgeColor = activeTab === 'service' ? '#15803d' : activeTab === 'livestream' ? '#dc2626' : '#374151';
-                  
-                  return (
-                    <div key={item.id} style={{ backgroundColor: 'white', borderRadius: '0.75rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e5e7eb', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                      
-                      {/* Image Container */}
-                      <div style={{ height: '160px', backgroundColor: '#f3f4f6', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {imgUrl ? (
-                          <img src={imgUrl} alt={item.name || item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        ) : (
-                          <span style={{ color: '#9ca3af', fontSize: '0.875rem', fontWeight: '500' }}>No Image</span>
-                        )}
-                        
-                        {/* Category Badge */}
-                        <span style={{ position: 'absolute', top: '0.5rem', left: '0.5rem', backgroundColor: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(4px)', padding: '0.25rem 0.5rem', borderRadius: '0.25rem', fontSize: '0.75rem', fontWeight: 'bold', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', color: badgeColor }}>
-                          {activeTab === 'livestream' ? 'Live Stream' : (item.category || activeTab)}
-                        </span>
-                      </div>
-                      
-                      {/* Details Container */}
-                      <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', flex: 1 }}>
-                        <h3 style={{ fontWeight: '600', color: '#1f2937', margin: '0 0 0.25rem 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={item.name || item.title}>
-                          {item.name || item.title}
-                        </h3>
-                        
-                        {activeTab === 'livestream' ? (
-                          <p style={{ color: '#ef4444', fontWeight: 'bold', margin: '0.25rem 0', fontSize: '0.875rem' }}>● LIVE NOW</p>
-                        ) : (
-                          <p style={{ color: '#2563eb', fontWeight: 'bold', margin: '0.25rem 0', fontSize: '1.125rem' }}>
-                            Rp {item.price?.toLocaleString('id-ID')}
-                          </p>
-                        )}
-                        
-                        {activeTab === 'product' && (
-                          <p style={{ color: '#6b7280', fontSize: '0.75rem', margin: '0' }}>Stock: {item.stock || 0}</p>
-                        )}
-                        
-                        {/* Buttons */}
-                        <div style={{ marginTop: 'auto', paddingTop: '1rem', display: 'flex', gap: '0.5rem' }}>
-                          <button onClick={() => handleEdit(item)} style={{ flex: 1, backgroundColor: '#f9fafb', color: '#2563eb', border: '1px solid #bfdbfe', padding: '0.375rem', borderRadius: '0.375rem', fontSize: '0.875rem', fontWeight: '500', cursor: 'pointer' }}>
-                            Edit
-                          </button>
-                          <button onClick={() => handleDelete(item.id)} style={{ flex: 1, backgroundColor: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', padding: '0.375rem', borderRadius: '0.375rem', fontSize: '0.875rem', fontWeight: '500', cursor: 'pointer' }}>
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
-      </div>
     </div>
   );
 }

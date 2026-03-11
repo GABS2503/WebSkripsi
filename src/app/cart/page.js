@@ -4,11 +4,13 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import Script from 'next/script';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation'; // <-- 1. IMPORT ROUTER
 
 export default function CartPage() {
   const { cart, removeFromCart } = useCart();
   const [groupedItems, setGroupedItems] = useState({});
   const [activeClientKey, setActiveClientKey] = useState("");
+  const router = useRouter(); // <-- 2. INITIALIZE ROUTER
 
   useEffect(() => {
     const groups = {};
@@ -58,33 +60,31 @@ export default function CartPage() {
         // @ts-ignore
         if (window.snap) {
           window.snap.pay(token, {
-           onSuccess: async function(result) {
-  try {
-    const userToken = localStorage.getItem('token'); 
-    
-    // --- NEW FIX: Get the actual logged-in user's name ---
-    const storedUserStr = localStorage.getItem('user');
-    const loggedInUser = storedUserStr ? JSON.parse(storedUserStr) : null;
-    const finalBuyerName = loggedInUser ? loggedInUser.username : (items[0]?.customerInfo?.name || "Guest");
-    // -----------------------------------------------------
+            onSuccess: async function(result) {
+              try {
+                const userToken = localStorage.getItem('token'); 
+                
+                // --- NEW FIX: Get the actual logged-in user's name ---
+                const storedUserStr = localStorage.getItem('user');
+                const loggedInUser = storedUserStr ? JSON.parse(storedUserStr) : null;
+                const finalBuyerName = loggedInUser ? loggedInUser.username : (items[0]?.customerInfo?.name || "Guest");
+                // -----------------------------------------------------
 
-    const locationData = items[0]?.customerInfo?.location || items[0]?.customerInfo || {};
-    const formattedSellerId = isNaN(sellerId) ? sellerId : Number(sellerId);
+                const locationData = items[0]?.customerInfo?.location || items[0]?.customerInfo || {};
+                const formattedSellerId = isNaN(sellerId) ? sellerId : Number(sellerId);
 
-    const payload = {
-      data: {
-        order_id: result.order_id, 
-        total_price: totalAmount,
-        buyer_name: finalBuyerName, // <-- Uses the real username now!
-        seller: formattedSellerId,
-        items: JSON.stringify(items),
-        delivery_location: JSON.stringify(locationData),
-        order_status: "paid",
-        publishedAt: new Date().toISOString() 
-      }
-    };
-
-    // ... (rest of the axios code stays the same)
+                const payload = {
+                  data: {
+                    order_id: result.order_id, 
+                    total_price: totalAmount,
+                    buyer_name: finalBuyerName, 
+                    seller: formattedSellerId,
+                    items: JSON.stringify(items),
+                    delivery_location: JSON.stringify(locationData),
+                    order_status: "paid", // You can change this to "Pending" if relying on Webhooks later
+                    publishedAt: new Date().toISOString() 
+                  }
+                };
 
                 // Add auth header if user is logged in
                 const headers = userToken ? { Authorization: `Bearer ${userToken}` } : {};
@@ -97,12 +97,13 @@ export default function CartPage() {
                 // Clear the purchased items from the cart
                 items.forEach(i => removeFromCart(i.uniqueId));
 
+                // <-- 3. REDIRECT TO ACCOUNT PAGE -->
+                router.push('/account');
+
               } catch (strapiError) {
                 console.error("Failed to save order to Strapi:", strapiError);
                 alert("Payment was successful, but there was an error saving the order to the database.");
               }
-              // ==========================================
-              
             },
             onPending: function(result) { 
               alert("Waiting for payment..."); 

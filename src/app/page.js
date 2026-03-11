@@ -214,10 +214,10 @@ export default function Marketplace() {
 
            {user && (
              <>
-               <div className="nav-item">
-                 <span>Hello, {user.username}</span>
-                 <span>Your Account</span>
-               </div>
+<Link href="/account" className="nav-item" style={{ textDecoration: 'none' }}>
+  <span>Hello, {user.username}</span>
+  <span>Your Account</span>
+</Link>
                
                {/* ==========================================
                    NEW CART & MY ORDERS BUTTONS
