@@ -14,6 +14,9 @@ const icon = L.icon({
 });
 
 // Component to handle mouse clicks on the map
+// ... keep your imports and Leaflet icon setup at the top ...
+
+// Component to handle mouse clicks on the map
 function LocationMarker({ position, setPosition }) {
   useMapEvents({
     click(e) {
@@ -34,12 +37,11 @@ function MapController({ center }) {
   return null;
 }
 
-// FIXED: Now expects 'location' and 'setLocation' to match your Seller/Checkout pages
-export default function MapPicker({ location, setLocation }) {
+// FIXED: Now accepts BOTH 'setLocation' (for Seller page) and 'onLocationSelect' (for Item page)
+export default function MapPicker({ location, setLocation, onLocationSelect }) {
   // --- DEFAULT TO MANADO CITY ---
   const manadoCoords = [1.4822, 124.8489];
   
-  // FIXED: If the user already has a saved location, load it immediately!
   const initialPos = location && location.lat ? location : null;
   const initialCenter = initialPos ? [initialPos.lat, initialPos.lng] : manadoCoords;
 
@@ -48,12 +50,15 @@ export default function MapPicker({ location, setLocation }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
 
-  // Send the selected location back to the parent page (Seller Dashboard or Checkout)
+  // We create a single updater function that uses whichever prop the parent page provided
+  const updateParentLocation = setLocation || onLocationSelect;
+
+  // Send the selected location back to the parent page
   useEffect(() => {
-    if (position && setLocation) {
-        setLocation(position);
+    if (position && updateParentLocation) {
+        updateParentLocation(position);
     }
-  }, [position, setLocation]); 
+  }, [position, updateParentLocation]); 
 
   // --- SEARCH FUNCTION USING OPENSTREETMAP ---
   const handleSearch = async () => {
@@ -61,7 +66,6 @@ export default function MapPicker({ location, setLocation }) {
     setIsSearching(true);
     
     try {
-      // Fetch coordinates from the free Nominatim API
       const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}`);
       const data = await res.json();
       
@@ -69,7 +73,6 @@ export default function MapPicker({ location, setLocation }) {
         const lat = parseFloat(data[0].lat);
         const lng = parseFloat(data[0].lon);
         
-        // Drop the pin and move the camera
         setPosition({ lat, lng });
         setMapCenter([lat, lng]);
       } else {
@@ -83,7 +86,6 @@ export default function MapPicker({ location, setLocation }) {
     }
   };
 
-  // Prevent pressing "Enter" from submitting the main Seller/Delivery form by mistake
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -132,3 +134,4 @@ export default function MapPicker({ location, setLocation }) {
     </div>
   );
 }
+
