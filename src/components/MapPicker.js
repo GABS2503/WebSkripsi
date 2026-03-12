@@ -34,22 +34,26 @@ function MapController({ center }) {
   return null;
 }
 
-export default function MapPicker({ onLocationSelect }) {
+// FIXED: Now expects 'location' and 'setLocation' to match your Seller/Checkout pages
+export default function MapPicker({ location, setLocation }) {
   // --- DEFAULT TO MANADO CITY ---
   const manadoCoords = [1.4822, 124.8489];
   
-  const [position, setPosition] = useState(null);
-  const [mapCenter, setMapCenter] = useState(manadoCoords);
+  // FIXED: If the user already has a saved location, load it immediately!
+  const initialPos = location && location.lat ? location : null;
+  const initialCenter = initialPos ? [initialPos.lat, initialPos.lng] : manadoCoords;
+
+  const [position, setPosition] = useState(initialPos);
+  const [mapCenter, setMapCenter] = useState(initialCenter);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
 
-  // Send the selected location back to the parent page (without causing an infinite loop)
+  // Send the selected location back to the parent page (Seller Dashboard or Checkout)
   useEffect(() => {
-    if (position && onLocationSelect) {
-        onLocationSelect(position);
+    if (position && setLocation) {
+        setLocation(position);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [position]); 
+  }, [position, setLocation]); 
 
   // --- SEARCH FUNCTION USING OPENSTREETMAP ---
   const handleSearch = async () => {
