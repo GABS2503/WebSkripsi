@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import axios from 'axios';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -34,8 +34,6 @@ export default function ItemDetails() {
   const [quantity, setQuantity] = useState(1);
   const [selectedVariants, setSelectedVariants] = useState({}); 
   const [activeImageIndex, setActiveImageIndex] = useState(0);
-  
-  // --- NEW: STATE FOR VARIANT IMAGE SWAPPING ---
   const [activeVariantImage, setActiveVariantImage] = useState(null);
 
   const [deliveryType, setDeliveryType] = useState(''); 
@@ -60,37 +58,59 @@ export default function ItemDetails() {
     fetchData();
   }, [id, type]);
 
-  // --- UPDATED: HANDLE VARIANT CLICK (Swaps Image) ---
   const handleVariantSelect = (variantName, optionName, optionImage) => {
     setSelectedVariants(prev => ({ ...prev, [variantName]: optionName }));
-    
-    // If the seller attached an image to this variant, show it!
     if (optionImage && optionImage.url) {
       setActiveVariantImage(getImageUrl(optionImage.url));
     }
   };
 
-  // --- UPDATED: GALLERY CLICK (Clears Variant Image) ---
   const handleGalleryClick = (index) => {
     setActiveImageIndex(index);
-    setActiveVariantImage(null); // Revert to standard gallery
+    setActiveVariantImage(null); 
   };
 
+  // --- FIXED 1: SAFELY STORE MAP LOCATION WITHOUT INFINITE LOOPS ---
+  const handleLocationSelect = useCallback((loc) => {
+    setCustomerInfo(prev => ({ ...prev, lat: loc.lat, lng: loc.lng }));
+  }, []);
+
+  // --- FIXED 2: ALLOW CHAT BUTTON TO READ STRAPI V5 IDS ---
   const handleChat = async () => {
     const userStr = localStorage.getItem('user');
     if (!userStr) { alert("Please login to chat."); router.push('/login'); return; }
     const currentUser = JSON.parse(userStr);
     const token = localStorage.getItem('token');
-    let sellerId = null; let itemName = "Item";
-    const extractId = (obj) => obj?.data?.id || obj?.id;
+    
+    let sellerId = null; 
+    let itemName = "Item";
+    
+    // Looks for documentId first, then falls back to regular id
+    const extractId = (obj) => obj?.data?.documentId || obj?.data?.id || obj?.documentId || obj?.id;
+    
     if (item) {
-      if (item.seller) { sellerId = extractId(item.seller); itemName = item.name; }
-      else if (item.attributes?.seller) { sellerId = extractId(item.attributes.seller); itemName = item.attributes.name; }
+      const dataObj = item.attributes || item;
+      if (dataObj.seller) { 
+          sellerId = extractId(dataObj.seller); 
+          itemName = dataObj.name || dataObj.title; 
+      }
     }
-    if (!sellerId) return;
-    if (String(currentUser.id) === String(sellerId)) { alert("This is your own item!"); return; }
+    
+    if (!sellerId) { 
+        alert("Error: Could not identify the seller of this item."); 
+        return; 
+    }
+    
+    if (String(currentUser.id) === String(sellerId) || String(currentUser.documentId) === String(sellerId)) { 
+        alert("This is your own item!"); 
+        return; 
+    }
+    
     try {
-      const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/conversations`, { data: { users: [currentUser.id, sellerId], itemTitle: itemName } }, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/conversations`, { 
+          data: { users: [currentUser.id, sellerId], itemTitle: itemName } 
+      }, { headers: { Authorization: `Bearer ${token}` } });
+      
       router.push(`/chat?id=${res.data.data.documentId || res.data.data.id}`);
     } catch (err) { alert("Could not start chat."); }
   };
@@ -105,6 +125,7 @@ export default function ItemDetails() {
     }
     if (!deliveryType) { alert("Please select a delivery/service option."); return; }
     if (!customerInfo.name) { alert("Please enter your name."); return; }
+    
     if ((deliveryType === 'shipping' || deliveryType === 'home_service')) {
         if (!customerInfo.lat || !customerInfo.lng) { alert("Please pin your location on the map."); return; }
         if (!customerInfo.address) { alert("Please provide address details."); return; }
@@ -113,8 +134,6 @@ export default function ItemDetails() {
     const data = item.attributes || item;
     const price = data.price;
     const media = data.media?.data || data.media || [];
-    
-    // Check if the currently selected variant has a specific image, otherwise use default
     const finalImageUrl = activeVariantImage || getImageUrl(media[0]?.attributes?.url || media[0]?.url);
     const seller = data.seller?.data?.attributes || data.seller;
 
@@ -148,7 +167,6 @@ export default function ItemDetails() {
 
   const mediaList = getMediaList(data.media);
   
-  // --- CHOOSE WHICH MEDIA TO DISPLAY ---
   let displayMedia = null;
   if (activeVariantImage) {
       displayMedia = { url: activeVariantImage, isVideo: false };
@@ -228,7 +246,6 @@ export default function ItemDetails() {
               </div>
             )}
 
-            {/* --- RENDER VARIANTS WITH CLICK EVENT --- */}
             {variants.map((variant, i) => (
               <div key={i} style={{ marginBottom: '1.5rem' }}>
                 <div style={{ fontWeight: 'bold', marginBottom: '0.8rem', fontSize: '1.1rem', color: '#000' }}>
@@ -269,7 +286,6 @@ export default function ItemDetails() {
 
                   <hr style={{margin:'2rem 0', borderColor:'#d1d5db'}}/>
 
-                  {/* --- DELIVERY / SERVICE OPTIONS --- */}
                   <div style={{ marginBottom: '1.5rem' }}>
                     <label style={{fontWeight:'bold', display:'block', marginBottom:'1rem', fontSize: '1.15rem', color: '#000'}}>
                         {type === 'product' ? 'Collection Method:' : 'Service Location:'}
@@ -299,7 +315,10 @@ export default function ItemDetails() {
                         {(deliveryType === 'shipping' || deliveryType === 'home_service') && (
                             <div>
                                 <label style={{fontSize:'1.1rem', fontWeight:'bold', display:'block', marginBottom:'8px', color: '#000'}}>Pin Location</label>
-                                <MapPicker onLocationSelect={(loc) => setCustomerInfo({ ...customerInfo, lat: loc.lat, lng: loc.lng })} />
+                                
+                                {/* FIXED 1 APPLIED HERE */}
+                                <MapPicker onLocationSelect={handleLocationSelect} />
+                                
                                 <label style={{fontSize:'1.1rem', fontWeight:'bold', display:'block', marginTop:'15px', marginBottom: '8px', color: '#000'}}>Detail Address</label>
                                 <textarea placeholder="e.g. White fence, Unit 4B" style={{width:'100%', padding:'12px', border:'1px solid #9ca3af', borderRadius:'6px', fontSize: '1.05rem', color: '#000'}} rows={3} value={customerInfo.address} onChange={(e) => setCustomerInfo({...customerInfo, address: e.target.value})} />
                             </div>
