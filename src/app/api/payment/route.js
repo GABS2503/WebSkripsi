@@ -26,7 +26,7 @@ export async function POST(request) {
 
     // === CART CHECKOUT LOGIC ===
     if (type === 'cart_checkout') {
-      console.log("✅ PROCESSING AS CART CHECKOUT (Skipping DB Check)");
+      console.log("✅ PROCESSING AS CART CHECKOUT");
 
       const itemDetails = details ? details.map(item => ({
           id: String(item.id).substring(0, 50),
@@ -50,35 +50,8 @@ export async function POST(request) {
         credit_card: { secure: true }
       };
 
-      // --- SAVE ORDER TO STRAPI ---
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-      const sellerId = details[0]?.seller?.id || details[0]?.seller?.documentId;
-
-      if (sellerId) {
-          try {
-            await axios.post(`${apiUrl}/api/orders`, {
-                data: {
-                    order_id: orderId,
-                    total_price: parseInt(price),
-                    order_status: 'pending', // <--- CHANGED FROM 'status' TO 'order_status'
-                    buyer_name: details[0].customerInfo?.name || 'Guest',
-                    delivery_location: JSON.stringify({
-                        type: details[0].selectedOptions?.deliveryType,
-                        lat: details[0].customerInfo?.lat,
-                        lng: details[0].customerInfo?.lng,
-                        address_note: details[0].customerInfo?.address
-                    }),
-                    items: JSON.stringify(details.map(i => ({ name: i.name, qty: i.quantity, price: i.price }))),
-                    seller: sellerId 
-                }
-            }, {
-                headers: { Authorization: `Bearer ${STRAPI_API_TOKEN}` }
-            });
-            console.log("✅ Order saved to Strapi successfully");
-          } catch (dbError) {
-            console.error("❌ Failed to save order to Strapi:", dbError.response?.data || dbError.message);
-          }
-      }
+      // ❌ DELETED: The Strapi axios.post order creation was removed from here.
+      // It is now handled securely inside cart/page.js on successful payment!
 
     } 
     // === SINGLE ITEM LOGIC ===
