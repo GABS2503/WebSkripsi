@@ -60,42 +60,47 @@ export default function CartPage() {
         // @ts-ignore
         if (window.snap) {
           window.snap.pay(token, {
-            onSuccess: async function(result) {
+           onSuccess: async function(result) {
               try {
-                // --- FIXED: DELETED CLIENT-SIDE POST REQUEST ---
-                // The order is now securely created by the Strapi Webhook.
-                // We just need to notify the user, clear their cart, and redirect them!
+                const userToken = localStorage.getItem('token'); 
+                
+                const storedUserStr = localStorage.getItem('user');
+                const loggedInUser = storedUserStr ? JSON.parse(storedUserStr) : null;
+                const finalBuyerName = loggedInUser ? loggedInUser.username : (items[0]?.customerInfo?.name || "Guest");
+                
+                const locationData = items[0]?.customerInfo?.location || items[0]?.customerInfo || {};
+                const formattedSellerId = isNaN(sellerId) ? sellerId : Number(sellerId);
+
+                // Re-added the payload to create the order!
+                const payload = {
+                  data: {
+                    order_id: result.order_id, 
+                    total_price: totalAmount,
+                    buyer_name: finalBuyerName, 
+                    seller: formattedSellerId,
+                    items: JSON.stringify(items),
+                    delivery_location: JSON.stringify(locationData),
+                    order_status: "paid", 
+                    publishedAt: new Date().toISOString() 
+                  }
+                };
+
+                const headers = userToken ? { Authorization: `Bearer ${userToken}` } : {};
+
+                // Send order to Strapi
+                await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/orders`, payload, { headers });
 
                 alert("Payment Success! Order sent to seller.");
                 
-                // Clear the purchased items from the cart
+                // Clear the cart and redirect
                 items.forEach(i => removeFromCart(i.uniqueId));
-
-                // Redirect to account page
                 router.push('/account');
 
               } catch (error) {
-                console.error("Error during redirect:", error);
+                console.error("Error saving order:", error);
+                alert("Payment was successful, but there was an error saving the order.");
               }
             },
-            onPending: function(result) { 
-              alert("Waiting for payment..."); 
-            },
-            onError: function(result) { 
-              alert("Payment failed"); 
-            },
-            onClose: function () {
-              alert("You closed the popup without finishing the payment.");
-            }
-          });
-        }
-      }, 500);
-
-    } catch (err) {
-      console.error(err);
-      alert(err.response?.data?.error || "Payment initiation failed.");
-    }
-  };
 
   const grandTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
