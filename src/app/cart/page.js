@@ -60,7 +60,7 @@ export default function CartPage() {
         // @ts-ignore
         if (window.snap) {
           window.snap.pay(token, {
-           onSuccess: async function(result) {
+            onSuccess: async function(result) {
               try {
                 const userToken = localStorage.getItem('token'); 
                 
@@ -71,7 +71,7 @@ export default function CartPage() {
                 const locationData = items[0]?.customerInfo?.location || items[0]?.customerInfo || {};
                 const formattedSellerId = isNaN(sellerId) ? sellerId : Number(sellerId);
 
-                // Re-added the payload to create the order!
+                // Create the order in Strapi ONCE
                 const payload = {
                   data: {
                     order_id: result.order_id, 
@@ -101,6 +101,24 @@ export default function CartPage() {
                 alert("Payment was successful, but there was an error saving the order.");
               }
             },
+            onPending: function(result) { 
+              alert("Waiting for payment..."); 
+            },
+            onError: function(result) { 
+              alert("Payment failed"); 
+            },
+            onClose: function () {
+              alert("You closed the popup without finishing the payment.");
+            }
+          });
+        }
+      }, 500);
+
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.error || "Payment initiation failed.");
+    }
+  }; // <--- This bracket was likely missing!
 
   const grandTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
@@ -142,7 +160,7 @@ export default function CartPage() {
                     <div style={{flex:1}}>
                       <h4 style={{margin:0, fontSize:'1.1rem'}}>{item.name}</h4>
                       <div style={{color:'#666', fontSize:'0.9rem', margin:'5px 0'}}>
-                          {item.type.toUpperCase()} | Qty: {item.quantity} 
+                          {item.type?.toUpperCase()} | Qty: {item.quantity} 
                       </div>
                       <div style={{fontSize:'0.85rem', color:'#059669', background:'#ecfdf5', display:'inline-block', padding:'2px 8px', borderRadius:'4px'}}>
                           Option: <b>{item.selectedOptions?.deliveryType || "Standard"}</b>
