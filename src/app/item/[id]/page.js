@@ -277,12 +277,19 @@ export default function ItemDetails() {
                 <h3 style={{ color: '#ef4444', marginTop:0, fontSize: '1.5rem' }}>Currently Unavailable</h3>
               ) : (
                 <>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
-                    <span style={{ fontWeight: 'bold', fontSize: '1.15rem', color: '#000' }}>Quantity:</span>
-                    <select value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} style={{ padding: '0.6rem 1rem', borderRadius: '6px', border: '1px solid #ccc', fontSize: '1.1rem', color: '#000', background: '#fff', cursor: 'pointer' }}>
-                      {[...Array(Math.min(10, type === 'product' ? maxStock : 10)).keys()].map(n => <option key={n+1} value={n+1}>{n+1}</option>)}
-                    </select>
-                  </div>
+                 {/* --- STOCK DISPLAY --- */}
+{type === 'product' && (
+  <div style={{ marginBottom: '1rem', color: maxStock < 5 ? '#ef4444' : '#16a34a', fontWeight: 'bold' }}>
+    {maxStock > 0 ? `Stock Available: ${maxStock}` : 'Out of Stock'}
+  </div>
+)}
+
+<div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
+  <span style={{ fontWeight: 'bold', fontSize: '1.15rem', color: '#000' }}>Quantity:</span>
+  <select value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} style={{ padding: '0.6rem 1rem', borderRadius: '6px', border: '1px solid #ccc', fontSize: '1.1rem', color: '#000', background: '#fff', cursor: 'pointer' }}>
+    {[...Array(Math.min(10, type === 'product' ? maxStock : 10)).keys()].map(n => <option key={n+1} value={n+1}>{n+1}</option>)}
+  </select>
+</div>
 
                   <hr style={{margin:'2rem 0', borderColor:'#d1d5db'}}/>
 
