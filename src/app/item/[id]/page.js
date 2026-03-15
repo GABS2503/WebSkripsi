@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback } from 'react';
-import axios from 'axios';
+import axios from 'axios'; // We still keep axios imported because handleChat and handleAddToCart might need it, though handleAddToCart uses context. handleChat uses axios!
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Script from 'next/script';
@@ -39,28 +39,26 @@ export default function ItemDetails() {
   const [deliveryType, setDeliveryType] = useState(''); 
   const [customerInfo, setCustomerInfo] = useState({ name: '', address: '', lat: null, lng: null });
 
-useEffect(() => {
+  useEffect(() => {
     const fetchData = async () => {
       if (!id) return;
       try {
         const endpoint = type === 'product' ? 'products' : 'services';
         const token = localStorage.getItem('token');
         
-        // Add cache-busting headers
-        const config = {
-          headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache',
-            'Expires': '0',
-          }
+        const headers = {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         };
         
-        // Add a timestamp to the URL so the browser thinks it's a brand new request every time
-        const timestamp = new Date().getTime();
-        const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/${endpoint}/${id}?populate=*&t=${timestamp}`, config);
+        // --- FIXED: Swapped Axios for native Fetch to KILL Vercel Caching ---
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/${endpoint}/${id}?populate=*`, {
+          headers: headers,
+          cache: 'no-store' // <--- This forces Next.js & Vercel to fetch fresh live data every single time
+        });
         
-        setItem(res.data.data);
+        const json = await res.json();
+        setItem(json.data); // json.data is the exact same as res.data.data in axios
+        
       } catch (error) {
         console.error("Error loading item", error);
       } finally {
@@ -290,18 +288,18 @@ useEffect(() => {
               ) : (
                 <>
                  {/* --- STOCK DISPLAY --- */}
-{type === 'product' && (
-  <div style={{ marginBottom: '1rem', color: maxStock < 5 ? '#ef4444' : '#16a34a', fontWeight: 'bold' }}>
-    {maxStock > 0 ? `Stock Available: ${maxStock}` : 'Out of Stock'}
-  </div>
-)}
+                {type === 'product' && (
+                  <div style={{ marginBottom: '1rem', color: maxStock < 5 ? '#ef4444' : '#16a34a', fontWeight: 'bold' }}>
+                    {maxStock > 0 ? `Stock Available: ${maxStock}` : 'Out of Stock'}
+                  </div>
+                )}
 
-<div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
-  <span style={{ fontWeight: 'bold', fontSize: '1.15rem', color: '#000' }}>Quantity:</span>
-  <select value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} style={{ padding: '0.6rem 1rem', borderRadius: '6px', border: '1px solid #ccc', fontSize: '1.1rem', color: '#000', background: '#fff', cursor: 'pointer' }}>
-    {[...Array(Math.min(10, type === 'product' ? maxStock : 10)).keys()].map(n => <option key={n+1} value={n+1}>{n+1}</option>)}
-  </select>
-</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
+                  <span style={{ fontWeight: 'bold', fontSize: '1.15rem', color: '#000' }}>Quantity:</span>
+                  <select value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} style={{ padding: '0.6rem 1rem', borderRadius: '6px', border: '1px solid #ccc', fontSize: '1.1rem', color: '#000', background: '#fff', cursor: 'pointer' }}>
+                    {[...Array(Math.min(10, type === 'product' ? maxStock : 10)).keys()].map(n => <option key={n+1} value={n+1}>{n+1}</option>)}
+                  </select>
+                </div>
 
                   <hr style={{margin:'2rem 0', borderColor:'#d1d5db'}}/>
 
