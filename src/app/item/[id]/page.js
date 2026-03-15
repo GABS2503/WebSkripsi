@@ -39,15 +39,27 @@ export default function ItemDetails() {
   const [deliveryType, setDeliveryType] = useState(''); 
   const [customerInfo, setCustomerInfo] = useState({ name: '', address: '', lat: null, lng: null });
 
-  useEffect(() => {
+useEffect(() => {
     const fetchData = async () => {
       if (!id) return;
       try {
         const endpoint = type === 'product' ? 'products' : 'services';
         const token = localStorage.getItem('token');
-        const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
         
-        const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/${endpoint}/${id}?populate=*`, config);
+        // Add cache-busting headers
+        const config = {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+          }
+        };
+        
+        // Add a timestamp to the URL so the browser thinks it's a brand new request every time
+        const timestamp = new Date().getTime();
+        const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/${endpoint}/${id}?populate=*&t=${timestamp}`, config);
+        
         setItem(res.data.data);
       } catch (error) {
         console.error("Error loading item", error);
