@@ -4,13 +4,13 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import Script from 'next/script';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation'; // <-- 1. IMPORT ROUTER
+import { useRouter } from 'next/navigation';
 
 export default function CartPage() {
   const { cart, removeFromCart } = useCart();
   const [groupedItems, setGroupedItems] = useState({});
   const [activeClientKey, setActiveClientKey] = useState("");
-  const router = useRouter(); // <-- 2. INITIALIZE ROUTER
+  const router = useRouter();
 
   useEffect(() => {
     const groups = {};
@@ -62,47 +62,20 @@ export default function CartPage() {
           window.snap.pay(token, {
             onSuccess: async function(result) {
               try {
-                const userToken = localStorage.getItem('token'); 
-                
-                // --- NEW FIX: Get the actual logged-in user's name ---
-                const storedUserStr = localStorage.getItem('user');
-                const loggedInUser = storedUserStr ? JSON.parse(storedUserStr) : null;
-                const finalBuyerName = loggedInUser ? loggedInUser.username : (items[0]?.customerInfo?.name || "Guest");
-                // -----------------------------------------------------
-
-                const locationData = items[0]?.customerInfo?.location || items[0]?.customerInfo || {};
-                const formattedSellerId = isNaN(sellerId) ? sellerId : Number(sellerId);
-
-                const payload = {
-                  data: {
-                    order_id: result.order_id, 
-                    total_price: totalAmount,
-                    buyer_name: finalBuyerName, 
-                    seller: formattedSellerId,
-                    items: JSON.stringify(items),
-                    delivery_location: JSON.stringify(locationData),
-                    order_status: "paid", // You can change this to "Pending" if relying on Webhooks later
-                    publishedAt: new Date().toISOString() 
-                  }
-                };
-
-                // Add auth header if user is logged in
-                const headers = userToken ? { Authorization: `Bearer ${userToken}` } : {};
-
-                // Save to Strapi
-                await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/orders`, payload, { headers });
+                // --- FIXED: DELETED CLIENT-SIDE POST REQUEST ---
+                // The order is now securely created by the Strapi Webhook.
+                // We just need to notify the user, clear their cart, and redirect them!
 
                 alert("Payment Success! Order sent to seller.");
                 
                 // Clear the purchased items from the cart
                 items.forEach(i => removeFromCart(i.uniqueId));
 
-                // <-- 3. REDIRECT TO ACCOUNT PAGE -->
+                // Redirect to account page
                 router.push('/account');
 
-              } catch (strapiError) {
-                console.error("Failed to save order to Strapi:", strapiError);
-                alert("Payment was successful, but there was an error saving the order to the database.");
+              } catch (error) {
+                console.error("Error during redirect:", error);
               }
             },
             onPending: function(result) { 
@@ -130,7 +103,7 @@ export default function CartPage() {
     <div style={{ background: '#f3f4f6', minHeight: '100vh', padding: '2rem' }}>
       <div className="container" style={{maxWidth:'800px', margin:'0 auto'}}>
         
-        {/* --- BACK BUTTON ADDED HERE --- */}
+        {/* --- BACK BUTTON --- */}
         <div style={{ marginBottom: '1.5rem' }}>
             <Link href="/" style={{ textDecoration: 'none', color: '#374151', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '1.1rem' }}>
                 <span>&larr;</span> Continue Shopping
