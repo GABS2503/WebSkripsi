@@ -227,6 +227,11 @@ export default function Marketplace() {
                  🛒 Cart
                </Link>
 
+               {/* NEW MESSAGES BUTTON FOR EVERYONE */}
+               <Link href="/chat" className="nav-item" style={{background:'#e0e7ff', padding:'8px 12px', borderRadius:'12px', color:'#3730a3', fontWeight:'bold', display:'flex', alignItems:'center', gap:'5px', textDecoration:'none'}}>
+                 💬 Messages
+               </Link>
+
                {!user.isSeller && (
                  <Link href="/orders" className="nav-item" style={{background:'#e5e7eb', padding:'8px 12px', borderRadius:'12px', color:'#374151', fontWeight:'bold', display:'flex', alignItems:'center', gap:'5px', textDecoration:'none'}}>
                    📦 My Orders

@@ -226,13 +226,37 @@ export default function SellerDashboard() {
     <div className="container" style={{ maxWidth: '1000px', padding: '2rem 1rem' }}>
       
       {/* --- DASHBOARD HEADER --- */}
+{/* --- DASHBOARD HEADER --- */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1.5rem' }}>
         <h1 style={{ color: 'var(--action-primary)', fontSize: '2.4rem', margin: 0, fontWeight: '800', letterSpacing: '-1px' }}>
           Seller Dashboard
         </h1>
         <div style={{ display: 'flex', gap: '1rem' }}>
-          <button className="btn-primary" style={{ background: '#f59e0b', color: '#fff', padding: '0.6rem 1.5rem', minWidth: '120px', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)' }} onClick={() => router.push('/seller/orders')}>📦 Orders</button>
-          <button className="btn-secondary" style={{ background: 'var(--bg-element)', border: '1px solid var(--border-strong)' }} onClick={() => router.push('/')}>Back to Market</button>
+          
+          {/* NEW MESSAGES BUTTON */}
+          <button 
+            className="btn-primary" 
+            style={{ background: '#3b82f6', color: '#fff', padding: '0.6rem 1.5rem', minWidth: '120px', boxShadow: '0 4px 12px rgba(59, 130, 246, 0.2)' }} 
+            onClick={() => router.push('/chat')}
+          >
+            💬 Messages
+          </button>
+
+          <button 
+            className="btn-primary" 
+            style={{ background: '#f59e0b', color: '#fff', padding: '0.6rem 1.5rem', minWidth: '120px', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)' }} 
+            onClick={() => router.push('/seller/orders')}
+          >
+            📦 Orders
+          </button>
+          
+          <button 
+            className="btn-secondary" 
+            style={{ background: 'var(--bg-element)', border: '1px solid var(--border-strong)' }} 
+            onClick={() => router.push('/')}
+          >
+            Back to Market
+          </button>
         </div>
       </div>
 
