@@ -25,6 +25,9 @@ export default function Marketplace() {
   const [search, setSearch] = useState('');
   const [user, setUser] = useState(null);
 
+  // --- MAP TOGGLE STATE ---
+  const [showMap, setShowMap] = useState(false);
+
   // --- STATE FOR RANDOM MOVING IMAGES ---
   const [featuredItems, setFeaturedItems] = useState([]);
 
@@ -85,7 +88,9 @@ export default function Marketplace() {
         mediaUrl: mediaUrl, 
         isVideo: mimeType.startsWith('video/'),
         reviewCount: reviewCount, 
-        rating: averageRating
+        rating: averageRating,
+        isPromo: data.isPromo || false,
+        promoPrice: data.promoPrice || null
       };
     });
   };
@@ -171,17 +176,16 @@ export default function Marketplace() {
       processedItems = processedItems.filter(item => item.category === categoryFilter);
   }
 
+  const getActivePrice = (item) => item.isPromo && item.promoPrice ? item.promoPrice : item.price;
+
   if (sortPrice === 'low_to_high') {
-      processedItems.sort((a, b) => a.price - b.price);
+      processedItems.sort((a, b) => getActivePrice(a) - getActivePrice(b));
   } else if (sortPrice === 'high_to_low') {
-      processedItems.sort((a, b) => b.price - a.price);
+      processedItems.sort((a, b) => getActivePrice(b) - getActivePrice(a));
   }
 
   const availableCategories = Array.from(new Set(items.map(i => i.category).filter(Boolean)));
 
-  // -------------------------------------------------------------
-  // EASTER EGG ACTIVATOR
-  // -------------------------------------------------------------
   const isMemeActive = search.trim() === '67';
 
   return (
@@ -214,28 +218,21 @@ export default function Marketplace() {
 
            {user && (
              <>
-<Link href="/account" className="nav-item" style={{ textDecoration: 'none' }}>
-  <span>Hello, {user.username}</span>
-  <span>Your Account</span>
-</Link>
+                <Link href="/account" className="nav-item" style={{ textDecoration: 'none' }}>
+                  <span>Hello, {user.username}</span>
+                  <span>Your Account</span>
+                </Link>
                
-               {/* ==========================================
-                   NEW CART & MY ORDERS BUTTONS
-                   ========================================== */}
-               
-               {/* Global Cart Button */}
                <Link href="/cart" className="nav-item" style={{background:'#fef3c7', padding:'8px 12px', borderRadius:'12px', color:'#92400e', fontWeight:'bold', display:'flex', alignItems:'center', gap:'5px', textDecoration:'none'}}>
                  🛒 Cart
                </Link>
 
-               {/* My Orders Button (Only for Buyers) */}
                {!user.isSeller && (
                  <Link href="/orders" className="nav-item" style={{background:'#e5e7eb', padding:'8px 12px', borderRadius:'12px', color:'#374151', fontWeight:'bold', display:'flex', alignItems:'center', gap:'5px', textDecoration:'none'}}>
                    📦 My Orders
                  </Link>
                )}
 
-               {/* Seller Dashboard Button (Only for Sellers) */}
                {user.isSeller && (
                  <Link href="/seller" className="nav-item" style={{background:'#eff6ff', padding:'8px 12px', borderRadius:'12px', display:'flex', alignItems:'center', textDecoration:'none'}}>
                    <span style={{color: '#2563eb', fontWeight:'bold'}}>Seller Zone</span>
@@ -252,15 +249,12 @@ export default function Marketplace() {
 
       <main className="container">
         
-        {/* ==============================================
-            THE NEW ANIMATED MARQUEE CAROUSEL 
-            ============================================== */}
+        {/* --- THE NEW ANIMATED MARQUEE CAROUSEL --- */}
         {featuredItems.length > 0 && (
           <div style={{ marginBottom: '3rem' }}>
             <h2 style={{ fontSize: '1.8rem', color: '#0f172a', marginBottom: '0.5rem' }}>Discover Random Finds</h2>
             <div className="marquee-container">
               <div className="marquee-content">
-                {/* We map the items TWICE so the loop looks perfectly endless */}
                 {[...featuredItems, ...featuredItems].map((item, idx) => (
                   <Link key={idx} href={`/item/${item.documentId}?type=${item.type}`} style={{ textDecoration: 'none' }}>
                     <div className="marquee-item">
@@ -269,7 +263,13 @@ export default function Marketplace() {
                       </div>
                       <div className="marquee-text-wrap">
                         <div className="marquee-title">{item.name}</div>
-                        <div className="marquee-price">Rp {item.price?.toLocaleString()}</div>
+                        <div className="marquee-price">
+                          {item.isPromo && item.promoPrice ? (
+                            <span style={{ color: '#ef4444', fontWeight: 'bold' }}>Rp {item.promoPrice?.toLocaleString('id-ID')}</span>
+                          ) : (
+                            <span>Rp {item.price?.toLocaleString('id-ID')}</span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </Link>
@@ -279,10 +279,31 @@ export default function Marketplace() {
           </div>
         )}
 
-        {/* --- GLOBAL STORE MAP --- */}
+        {/* --- GLOBAL STORE MAP WITH TOGGLE --- */}
         <div style={{marginBottom:'3rem'}}>
-            <h2 style={{fontSize:'1.8rem', color:'#0f172a', marginBottom:'1rem'}}>Explore Local Stores</h2>
-            <StoreMap sellers={sellersMapLocations} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h2 style={{fontSize:'1.8rem', color:'#0f172a', margin: 0}}>Explore Local Stores</h2>
+              <button 
+                onClick={() => setShowMap(!showMap)}
+                style={{
+                  padding: '0.6rem 1.2rem',
+                  background: showMap ? '#f1f5f9' : '#2563eb',
+                  color: showMap ? '#333' : '#fff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  transition: 'all 0.2s',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                }}
+              >
+                {showMap ? 'Hide Map 🗺️' : 'Show Map 🗺️'}
+              </button>
+            </div>
+            
+            {showMap && (
+              <StoreMap sellers={sellersMapLocations} />
+            )}
         </div>
 
         {/* --- LIVE SECTION --- */}
@@ -358,16 +379,17 @@ export default function Marketplace() {
                 </div>
               </Link>
               
-              <div className="card-body">
+              <div className="card-body" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                 <Link href={`/item/${item.documentId}?type=${item.type}`} style={{textDecoration:'none', color:'inherit'}}>
-                   <h3 style={{cursor:'pointer'}}>{item.name}</h3>
+                   <h3 style={{cursor:'pointer', marginBottom: '8px'}}>{item.name}</h3>
                 </Link>
 
-                <span style={{fontSize:'0.8rem', background:'#e0e7ff', padding:'4px 10px', borderRadius:'12px', display:'inline-block', marginBottom:'8px', color:'#2563eb', fontWeight: 'bold'}}>
-                  {item.category || item.type.toUpperCase()}
-                </span>
+                <div>
+                  <span style={{fontSize:'0.8rem', background:'#e0e7ff', padding:'4px 10px', borderRadius:'12px', display:'inline-block', marginBottom:'8px', color:'#2563eb', fontWeight: 'bold'}}>
+                    {item.category || item.type.toUpperCase()}
+                  </span>
+                </div>
                 
-                {/* --- RATING SECTION --- */}
                 <div style={{color:'#f59e0b', fontSize:'1rem', margin:'0.5rem 0', display:'flex', alignItems:'center', gap:'5px'}}>
                    <span style={{letterSpacing:'-2px'}}>
                       {renderStars(item.rating || 0)}
@@ -380,16 +402,30 @@ export default function Marketplace() {
                    </span>
                 </div>
                 
-                <div className="price-tag">
-                   <span style={{fontSize:'0.9rem', position:'relative', top:'2px'}}>Rp</span>
-                   <span style={{fontWeight:'800'}}>{item.price?.toLocaleString()}</span>
+                <div className="price-tag" style={{ display: 'flex', flexDirection: 'column', marginBottom: '10px' }}>
+                   {item.isPromo && item.promoPrice ? (
+                     <>
+                       <span style={{ textDecoration: 'line-through', color: '#9ca3af', fontSize: '0.85rem', fontWeight: 'normal' }}>
+                         Rp {item.price?.toLocaleString('id-ID')}
+                       </span>
+                       <div style={{ color: '#ef4444', fontWeight: '800', fontSize: '1.2rem', marginTop: '-2px' }}>
+                         <span style={{fontSize:'0.9rem', position:'relative', top:'-2px'}}>Rp </span>
+                         {item.promoPrice?.toLocaleString('id-ID')}
+                       </div>
+                     </>
+                   ) : (
+                     <div style={{ color: '#2563eb', fontWeight: '800', fontSize: '1.2rem' }}>
+                       <span style={{fontSize:'0.9rem', position:'relative', top:'-2px'}}>Rp </span>
+                       {item.price?.toLocaleString('id-ID')}
+                     </div>
+                   )}
                 </div>
                 
-                <div className="seller-badge">
+                <div className="seller-badge" style={{ marginTop: 'auto', marginBottom: '10px' }}>
                   Sold by <strong>{item.sellerName}</strong>
                 </div>
 
-                <Link href={`/item/${item.documentId}?type=${item.type}`} style={{width:'100%', marginTop: 'auto'}}>
+                <Link href={`/item/${item.documentId}?type=${item.type}`} style={{width:'100%'}}>
                    <button className="btn-primary" style={{width:'100%'}}>View Details</button>
                 </Link>
               </div>

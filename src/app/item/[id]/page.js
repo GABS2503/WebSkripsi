@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback } from 'react';
-import axios from 'axios'; // We still keep axios imported because handleChat and handleAddToCart might need it, though handleAddToCart uses context. handleChat uses axios!
+import axios from 'axios';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Script from 'next/script';
@@ -50,14 +50,13 @@ export default function ItemDetails() {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         };
         
-        // --- FIXED: Swapped Axios for native Fetch to KILL Vercel Caching ---
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/${endpoint}/${id}?populate=*`, {
           headers: headers,
-          cache: 'no-store' // <--- This forces Next.js & Vercel to fetch fresh live data every single time
+          cache: 'no-store' 
         });
         
         const json = await res.json();
-        setItem(json.data); // json.data is the exact same as res.data.data in axios
+        setItem(json.data); 
         
       } catch (error) {
         console.error("Error loading item", error);
@@ -80,12 +79,10 @@ export default function ItemDetails() {
     setActiveVariantImage(null); 
   };
 
-  // --- FIXED 1: SAFELY STORE MAP LOCATION WITHOUT INFINITE LOOPS ---
   const handleLocationSelect = useCallback((loc) => {
     setCustomerInfo(prev => ({ ...prev, lat: loc.lat, lng: loc.lng }));
   }, []);
 
-  // --- FIXED 2: ALLOW CHAT BUTTON TO READ STRAPI V5 IDS ---
   const handleChat = async () => {
     const userStr = localStorage.getItem('user');
     if (!userStr) { alert("Please login to chat."); router.push('/login'); return; }
@@ -95,7 +92,6 @@ export default function ItemDetails() {
     let sellerId = null; 
     let itemName = "Item";
     
-    // Looks for documentId first, then falls back to regular id
     const extractId = (obj) => obj?.data?.documentId || obj?.data?.id || obj?.documentId || obj?.id;
     
     if (item) {
@@ -142,12 +138,15 @@ export default function ItemDetails() {
     }
 
     const data = item.attributes || item;
-    const price = data.price;
+    
+    // --- FIXED: Use the Promo Price if a promo is active! ---
+    const activePrice = data.isPromo && data.promoPrice ? data.promoPrice : data.price;
+    
     const media = data.media?.data || data.media || [];
     const finalImageUrl = activeVariantImage || getImageUrl(media[0]?.attributes?.url || media[0]?.url);
     const seller = data.seller?.data?.attributes || data.seller;
 
-    const cartPayload = { id: item.documentId || item.id, name: name, price: price, image: finalImageUrl, seller: seller, type: type, quantity: quantity };
+    const cartPayload = { id: item.documentId || item.id, name: name, price: activePrice, image: finalImageUrl, seller: seller, type: type, quantity: quantity };
     const options = { variants: selectedVariants, deliveryType: deliveryType };
     addToCart(cartPayload, options, customerInfo);
   };
@@ -161,7 +160,7 @@ export default function ItemDetails() {
   const sellerClientKey = sellerRaw.midtransClientKey || sellerRaw.midtrans_client_key || "";
   const variants = data.variantData || [];
   const attributes = data.customAttributes || [];
-  const maxStock = data.stock || 999;
+  const maxStock = data.stock ?? 999;
   const isOutOfStock = type === 'product' && maxStock < 1;
 
   const getMediaList = (mediaField) => {
@@ -232,8 +231,23 @@ export default function ItemDetails() {
 
             <hr style={{ margin: '1.5rem 0', borderColor: '#e5e7eb' }} />
 
-            <div style={{ fontSize: '2rem', fontWeight: '900', color: '#000', marginBottom: '1.5rem' }}>
-              Rp {data.price?.toLocaleString()}
+            {/* --- FIXED: VISUAL PROMO PRICE DISPLAY --- */}
+            <div style={{ marginBottom: '1.5rem' }}>
+              {data.isPromo && data.promoPrice ? (
+                <>
+                  <div style={{ textDecoration: 'line-through', color: '#9ca3af', fontSize: '1.3rem', fontWeight: 'bold' }}>
+                    Rp {data.price?.toLocaleString('id-ID')}
+                  </div>
+                  <div style={{ fontSize: '2.2rem', fontWeight: '900', color: '#ef4444' }}>
+                    Rp {data.promoPrice?.toLocaleString('id-ID')}
+                    <span style={{ marginLeft: '12px', background: '#fef2f2', color: '#ef4444', padding: '4px 8px', borderRadius: '6px', fontSize: '1rem', border: '1px solid #fca5a5', verticalAlign: 'middle' }}>PROMO</span>
+                  </div>
+                </>
+              ) : (
+                <div style={{ fontSize: '2.2rem', fontWeight: '900', color: '#000' }}>
+                  Rp {data.price?.toLocaleString('id-ID')}
+                </div>
+              )}
             </div>
 
             <p style={{ lineHeight: '1.8', color: '#000', whiteSpace: 'pre-line', fontSize: '1.15rem', marginBottom: '2rem' }}>
@@ -287,19 +301,20 @@ export default function ItemDetails() {
                 <h3 style={{ color: '#ef4444', marginTop:0, fontSize: '1.5rem' }}>Currently Unavailable</h3>
               ) : (
                 <>
-                 {/* --- STOCK DISPLAY --- */}
-                {type === 'product' && (
-                  <div style={{ marginBottom: '1rem', color: maxStock < 5 ? '#ef4444' : '#16a34a', fontWeight: 'bold' }}>
-                    {maxStock > 0 ? `Stock Available: ${maxStock}` : 'Out of Stock'}
-                  </div>
-                )}
+                 {type === 'product' && (
+                  <>
+                    <div style={{ marginBottom: '1rem', color: maxStock < 5 ? '#ef4444' : '#16a34a', fontWeight: 'bold' }}>
+                      {maxStock > 0 ? `Stock Available: ${maxStock}` : 'Out of Stock'}
+                    </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
-                  <span style={{ fontWeight: 'bold', fontSize: '1.15rem', color: '#000' }}>Quantity:</span>
-                  <select value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} style={{ padding: '0.6rem 1rem', borderRadius: '6px', border: '1px solid #ccc', fontSize: '1.1rem', color: '#000', background: '#fff', cursor: 'pointer' }}>
-                    {[...Array(Math.min(10, type === 'product' ? maxStock : 10)).keys()].map(n => <option key={n+1} value={n+1}>{n+1}</option>)}
-                  </select>
-                </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
+                      <span style={{ fontWeight: 'bold', fontSize: '1.15rem', color: '#000' }}>Quantity:</span>
+                      <select value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} style={{ padding: '0.6rem 1rem', borderRadius: '6px', border: '1px solid #ccc', fontSize: '1.1rem', color: '#000', background: '#fff', cursor: 'pointer' }}>
+                        {[...Array(Math.min(10, maxStock)).keys()].map(n => <option key={n+1} value={n+1}>{n+1}</option>)}
+                      </select>
+                    </div>
+                  </>
+                )}
 
                   <hr style={{margin:'2rem 0', borderColor:'#d1d5db'}}/>
 
@@ -333,7 +348,6 @@ export default function ItemDetails() {
                             <div>
                                 <label style={{fontSize:'1.1rem', fontWeight:'bold', display:'block', marginBottom:'8px', color: '#000'}}>Pin Location</label>
                                 
-                                {/* FIXED 1 APPLIED HERE */}
                                 <MapPicker onLocationSelect={handleLocationSelect} />
                                 
                                 <label style={{fontSize:'1.1rem', fontWeight:'bold', display:'block', marginTop:'15px', marginBottom: '8px', color: '#000'}}>Detail Address</label>
